@@ -1,5 +1,5 @@
 [project]
-name = "xeroxd-books"
+name = "plainbooks"
 version = "0.3.0"
 description = "Local-first, AI-assisted bookkeeping for small businesses on a plain-text Beancount ledger"
 readme = "README.md"

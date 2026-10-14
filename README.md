@@ -1,4 +1,4 @@
-# Books
+# Plainbooks
 
 Local-first bookkeeping for small businesses, built on a plain-text
 [Beancount](https://beancount.github.io/) ledger. You keep the books in a
@@ -21,7 +21,7 @@ Requires Python 3.11+. Poppler (`pdftotext`) is optional and improves PDF
 statement parsing.
 
 ```bash
-pipx install "git+<repository-url>"      # or: pip install .
+pipx install .                          # from a checkout (PyPI: `plainbooks`, not yet published)
 books demo ~/books-demo                  # a fictional company to explore
 books --workspace ~/books-demo serve     # opens http://127.0.0.1:5170
 ```

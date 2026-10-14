@@ -1,4 +1,4 @@
-# Books: Product Definition
+# Plainbooks: Product Definition
 
 ## Register
 
@@ -8,7 +8,7 @@ product
 
 | Field | Definition |
 | --- | --- |
-| Product | Books (distribution `xeroxd-books`) |
+| Product | Plainbooks (distribution `plainbooks`, command `books`) |
 | Category | Local-first, AI-assisted bookkeeping workspace and app |
 | Primary user | The technical owner-operator of a small business (solo LLC, freelancer, small studio) who already uses a coding agent |
 | Operating model | One workspace per company (`books.toml`), plain-text Beancount ledger, deterministic Python tools, git audit trail, a local web app, and Fava for detailed reports |
