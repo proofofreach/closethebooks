@@ -174,3 +174,25 @@ def test_fetch_changes_needs_a_full_backup_then_resumes_a_paused_run(migration, 
     xero.start_backup(); wait()                      # a plain resume continues the same delta
     assert calls[-1] == (since, delta_id) and xero.job.state == "complete"
     assert xero.pending_delta() is None
+
+
+def test_progress_reports_the_current_phase(migration):
+    from xero_absolute_backup.models import ENDPOINTS
+    from xero_absolute_backup.state import StateStore
+
+    xero, _backup = migration
+    xero.state_db.parent.mkdir(parents=True, exist_ok=True)
+    store = StateStore(xero.state_db)
+    store.upsert_sync_status(ENDPOINTS[0].key, completed=True)
+    store.upsert_entity("e1", "invoices", True)
+    store.commit()
+    store.close()
+    phase = xero.progress()["phase"]
+    assert (phase["step"], phase["done"], phase["total"]) == (1, 1, len(ENDPOINTS))
+
+    store = StateStore(xero.state_db)
+    for endpoint in ENDPOINTS:
+        store.upsert_sync_status(endpoint.key, completed=True)
+    store.commit()
+    store.close()
+    assert xero.progress()["phase"]["label"] == "Finding attachments"

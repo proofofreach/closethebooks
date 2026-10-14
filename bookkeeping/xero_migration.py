@@ -280,16 +280,40 @@ class XeroMigration:
         return None
 
     def progress(self) -> dict:
-        summary: dict = {}
-        if self.state_db.exists():
-            from xero_absolute_backup.state import StateStore
+        """Counts plus the current phase of the running (or last) backup.
 
-            store = StateStore(self.state_db)
-            try:
-                summary = store.get_summary()
-            finally:
-                store.close()
-        return summary
+        Phases: records (data types finished of all), discovery (records
+        with attachments checked), downloads (attachments downloaded).
+        """
+        if not self.state_db.exists():
+            return {}
+        from xero_absolute_backup.models import ENDPOINTS
+        from xero_absolute_backup.state import StateStore
+
+        pending = self.pending_delta()
+        suffix = f"@{pending['id']}" if pending else ""
+        store = StateStore(self.state_db)
+        try:
+            summary = store.get_summary()
+            query = store.connection.execute
+            done = {
+                row[0]
+                for row in query("SELECT endpoint FROM sync_status WHERE completed = 1")
+            }
+            with_attachments = query("SELECT COUNT(*) FROM entities WHERE has_attachments = 1").fetchone()[0]
+            undiscovered = query(
+                "SELECT COUNT(*) FROM entities WHERE has_attachments = 1 AND attachment_discovered = 0"
+            ).fetchone()[0]
+        finally:
+            store.close()
+        types_done = sum(1 for endpoint in ENDPOINTS if f"{endpoint.key}{suffix}" in done)
+        if types_done < len(ENDPOINTS):
+            phase = {"step": 1, "label": "Fetching records", "done": types_done, "total": len(ENDPOINTS), "unit": "data types"}
+        elif undiscovered:
+            phase = {"step": 2, "label": "Finding attachments", "done": with_attachments - undiscovered, "total": with_attachments, "unit": "records checked"}
+        else:
+            phase = {"step": 3, "label": "Downloading attachments", "done": summary["attachments_downloaded"], "total": summary["attachments_queued"], "unit": "attachments"}
+        return {**summary, "phase": phase}
 
     # General ledger and conversion ----------------------------------------
 

@@ -412,3 +412,18 @@ input[type="file"]::file-selector-button {
 .inline-form { align-items: end; display: flex; flex-wrap: wrap; gap: var(--s3); margin-bottom: var(--s2); }
 .inline-form .field { flex: 1 1 220px; margin: 0; }
 .backup-message { margin: 0; }
+
+/* Backup progress meter */
+.meter { margin: var(--s3) 0; max-width: 560px; }
+.meter-head { display: flex; flex-wrap: wrap; font-size: 13px; gap: var(--s1) var(--s4); justify-content: space-between; margin-bottom: var(--s1); }
+.meter-head span:last-child { color: var(--ink-3); }
+.meter progress { appearance: none; background: var(--paper-sunken); border: 1px solid var(--rule-2); border-radius: 999px; display: block; height: 10px; overflow: hidden; width: 100%; }
+.meter progress::-webkit-progress-bar { background: var(--paper-sunken); }
+.meter progress::-webkit-progress-value { background: var(--stamp); border-radius: 999px; transition: width 300ms ease-out; }
+.meter progress::-moz-progress-bar { background: var(--stamp); border-radius: 999px; }
+.meter-steps { color: var(--ink-4); display: flex; font-size: 12px; gap: var(--s4); list-style: none; margin: var(--s2) 0 0; padding: 0; }
+.meter-steps li::before { content: "○ "; }
+.meter-steps li.done { color: var(--tick); }
+.meter-steps li.done::before { content: "✓ "; }
+.meter-steps li.now { color: var(--ink); font-weight: 600; }
+.meter-steps li.now::before { content: "● "; }

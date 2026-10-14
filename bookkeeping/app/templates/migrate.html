@@ -63,14 +63,28 @@
     <p class="lede">Downloads contacts, invoices, bank transactions, the chart of accounts, and every attachment. Large organisations can hit Xero's daily API limit; the backup then pauses and resumes where it stopped.</p>
     <div data-backup-status data-state="{{ m.job.state }}" role="status" aria-live="polite">
       <p class="backup-message">{% if m.job.message %}{{ m.job.message }}{% elif m.pending_delta %}Fetching changes since {{ m.pending_delta.since[:10] }} was paused.{% elif m.last_backup %}Backup complete, {{ m.last_backup.date() | day }}.{% elif m.manifest %}Paused: {{ m.manifest.rate_limit_reason or 'resume to continue' }}{% endif %}</p>
-      {% if m.progress %}<p class="hint backup-progress">{{ '{:,}'.format(m.progress.entities) }} records · {{ '{:,}'.format(m.progress.attachments_downloaded) }} of {{ '{:,}'.format(m.progress.attachments_queued) }} attachments</p>{% endif %}
+      {% if m.progress %}{% set ph = m.progress.phase %}
+        <div class="meter"{% if m.job.state != 'running' %} hidden{% endif %} data-meter>
+          <div class="meter-head">
+            <span data-meter-label>Step {{ ph.step }} of 3 · {{ ph.label }}</span>
+            <span data-meter-count>{{ '{:,}'.format(ph.done) }} of {{ '{:,}'.format(ph.total) }} {{ ph.unit }}</span>
+          </div>
+          <progress max="{{ ph.total or 1 }}" value="{{ ph.done }}" aria-label="Backup progress" data-meter-bar></progress>
+          <ol class="meter-steps" aria-hidden="true">
+            {% for label in ['Records', 'Find attachments', 'Download'] %}<li class="{{ 'done' if loop.index < ph.step else ('now' if loop.index == ph.step else '') }}">{{ label }}</li>{% endfor %}
+          </ol>
+        </div>
+        <p class="hint backup-progress"{% if m.job.state == 'running' %} hidden{% endif %}>{{ '{:,}'.format(m.progress.entities) }} records · {{ '{:,}'.format(m.progress.attachments_downloaded) }} of {{ '{:,}'.format(m.progress.attachments_queued) }} attachments</p>
+      {% endif %}
     </div>
     <form method="post" action="{{ url_for('migrate_backup') }}">
       <input type="hidden" name="csrf" value="{{ csrf_token }}">
       {% set busy = m.job.state == 'running' %}
-      {% if m.pending_delta %}
+      {% if busy %}
+        <button class="button" type="button" disabled aria-disabled="true">Working… you can leave this page</button>
+      {% elif m.pending_delta %}
         <input type="hidden" name="mode" value="changes">
-        <button class="button primary" type="submit" {{ 'disabled' if busy }}>Resume fetching changes</button>
+        <button class="button primary" type="submit">Resume fetching changes</button>
       {% elif m.last_backup %}
         <input type="hidden" name="mode" value="changes">
         <button class="button" type="submit" {{ 'disabled' if busy or not done.connect }}>Fetch changes since {{ m.last_backup.date() | day }}</button>

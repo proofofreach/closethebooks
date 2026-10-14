@@ -184,6 +184,19 @@
         const response = await fetch("/migrate/status", { headers: { Accept: "application/json" } });
         const data = await response.json();
         message.textContent = data.message;
+        const phase = data.progress.phase;
+        const meter = backup.querySelector("[data-meter]");
+        if (meter && phase) {
+          meter.hidden = false;
+          meter.querySelector("[data-meter-label]").textContent = `Step ${phase.step} of 3 · ${phase.label}`;
+          meter.querySelector("[data-meter-count]").textContent = `${phase.done.toLocaleString()} of ${phase.total.toLocaleString()} ${phase.unit}`;
+          const bar = meter.querySelector("[data-meter-bar]");
+          bar.max = phase.total || 1;
+          bar.value = phase.done;
+          meter.querySelectorAll(".meter-steps li").forEach((item, index) => {
+            item.className = index + 1 < phase.step ? "done" : index + 1 === phase.step ? "now" : "";
+          });
+        }
         if (progress && data.progress.entities !== undefined) {
           progress.textContent = `${data.progress.entities.toLocaleString()} records · ${data.progress.attachments_downloaded.toLocaleString()} of ${data.progress.attachments_queued.toLocaleString()} attachments`;
         }
