@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% from "_macros.html" import prompt_chip %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Import</h1>
+    <p>Statements become proposals here. Your coding agent reviews the categories and posts them to the ledger, and nothing is posted until you approve the diff.</p>
+  </div>
+</div>
+
+{% set has_files = files | length > 0 %}
+{% set has_proposals = proposals and (proposals.transactions or proposals.balances) %}
+<ol class="steps" aria-label="Import steps">
+  <li class="{{ 'done' if has_files or has_proposals else 'now' }}"><b>1. Add statements</b><span>Upload CSV, OFX, QFX, QBO, or a supported PDF.</span></li>
+  <li class="{{ 'done' if has_proposals else ('now' if has_files else '') }}"><b>2. Prepare proposals</b><span>Deduplicate, suggest categories, and keep statement evidence.</span></li>
+  <li class="{{ 'now' if has_proposals else '' }}"><b>3. Review and post</b><span>Ask your coding agent to do the books, then approve the diff.</span></li>
+</ol>
+
+<section aria-labelledby="upload-heading">
+  <div class="section-head"><h2 id="upload-heading">Add a statement</h2></div>
+  {% if sources %}
+  <form class="upload-form" action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data" data-upload-form>
+    <input type="hidden" name="csrf" value="{{ csrf_token }}">
+    <div class="field">
+      <label for="upload-account">Account</label>
+      <select id="upload-account" name="account_key" required data-accept-map='{{ extensions | tojson }}'>
+        {% for source in sources %}<option value="{{ source.key }}">{{ source.name }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="upload-file">Statement file</label>
+      <input id="upload-file" type="file" name="statement" required accept="{{ extensions[sources[0].key] }}">
+    </div>
+    <button class="button primary" type="submit">Upload</button>
+  </form>
+  {% else %}
+  <div class="empty"><p>No active accounts yet. Add a bank or card account first, so each statement lands on the right ledger account.</p>
+    <a class="button primary" href="{{ url_for('account_new') }}">Add account</a></div>
+  {% endif %}
+</section>
+
+<section class="section" aria-labelledby="inbox-heading">
+  <div class="section-head"><h2 id="inbox-heading">Inbox</h2>
+    <span class="aside mono">{{ workspace.relative(workspace.inbox) }}/</span></div>
+  {% if files %}
+  <div class="table-wrap">
+    <table class="responsive">
+      <thead><tr><th scope="col">File</th><th scope="col">Account</th><th scope="col" class="num">Size</th><th scope="col">Added</th></tr></thead>
+      <tbody>
+      {% for file in files %}
+        <tr>
+          <td class="wide"><span class="mono" style="overflow-wrap:anywhere">{{ file.name }}</span></td>
+          <td data-label="Account">{% if file.account %}{{ file.account }}{% if not file.active %} <span class="status muted">Inactive</span>{% endif %}{% else %}<span class="status due">No account</span>{% endif %}</td>
+          <td data-label="Size" class="num">{{ file.size | filesizeformat }}</td>
+          <td data-label="Added">{{ file.added.date() | day }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <form action="{{ url_for('prepare') }}" method="post" class="form-actions" data-busy-form>
+    <input type="hidden" name="csrf" value="{{ csrf_token }}">
+    <button class="button primary" type="submit" data-busy-label="Preparing…">Prepare proposals</button>
+    <span class="muted" style="font-size:13px">Reads every inbox file with an active account, plus connected bank feeds. Safe to repeat: transactions already in the ledger are skipped.</span>
+  </form>
+  {% else %}
+  <div class="empty"><p>The inbox is empty. Upload a statement above, or drop files into <span class="mono">{{ workspace.relative(workspace.inbox) }}/</span> named <span class="mono">&lt;account-key&gt;--&lt;name&gt;.csv</span>.</p></div>
+  {% endif %}
+</section>
+
+<section class="section" aria-labelledby="proposals-heading">
+  <div class="section-head"><h2 id="proposals-heading">Proposals</h2>
+    {% if proposals %}<span class="aside">Prepared {{ proposals.updated.date() | day }} · <span class="mono">{{ proposals.path }}</span></span>{% endif %}</div>
+  {% if has_proposals %}
+    {% set uncategorized = proposals.transactions | selectattr('suggested', 'false') | list | length %}
+    <p class="lede">{{ proposals.transactions | length }} transaction{{ 's' if proposals.transactions | length != 1 }} proposed{% if uncategorized %}; {{ uncategorized }} without a category suggestion{% endif %}{% if proposals.balances %}; {{ proposals.balances | length }} statement balance{{ 's' if proposals.balances | length != 1 }} to verify{% endif %}.</p>
+    {% if proposals.transactions %}
+    <div class="table-wrap" role="region" aria-labelledby="proposals-heading" tabindex="0">
+      <table class="responsive">
+        <thead><tr><th scope="col">Date</th><th scope="col">Description</th><th scope="col">Suggested category</th><th scope="col" class="num">Amount</th></tr></thead>
+        <tbody>
+        {% for txn in proposals.transactions %}
+          <tr>
+            <td data-label="Date">{{ txn.date | day('short') }}</td>
+            <td class="wide"><span>{{ txn.description }}</span><span class="account-path">{{ txn.account }}</span></td>
+            <td data-label="Category">
+              <span class="category{{ ' uncategorized' if not txn.suggested }}">{{ txn.category }}</span>
+              {% if txn.confidence is not none %}<span class="confidence" title="{{ txn.evidence }}"> · {{ '%.0f' % (txn.confidence * 100) }}% match</span>{% endif %}
+            </td>
+            <td data-label="Amount" class="num">{{ txn.amount | money(txn.currency) }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+    {% if proposals.balances %}
+      <h3 style="margin-top:24px">Statement balances</h3>
+      <table class="responsive">
+        <thead><tr><th scope="col">Account</th><th scope="col">Balance at start of</th><th scope="col" class="num">Amount</th></tr></thead>
+        <tbody>{% for balance in proposals.balances %}<tr><td class="wide mono">{{ balance.account }}</td><td data-label="Date">{{ balance.date | day }}</td><td data-label="Amount" class="num">{{ balance.amount | money(balance.currency) }}</td></tr>{% endfor %}</tbody>
+      </table>
+    {% endif %}
+    <div class="handoff">
+      <p>Next, have your coding agent categorize, post, and validate these, then review the diff before it commits.</p>
+      {{ prompt_chip('do the books') }}
+    </div>
+  {% elif proposals %}
+    <div class="empty"><p>The last preparation found nothing new. Every transaction in the inbox is already in the ledger.</p></div>
+  {% else %}
+    <div class="empty"><p>No proposals yet. Prepare proposals after adding statements.</p></div>
+  {% endif %}
+</section>
+{% endblock %}

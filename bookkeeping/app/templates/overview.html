@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% from "_macros.html" import dropzone, prompt_chip, status, strip, strip_months %}
+{% block content %}
+{% set cur = d.currency %}
+
+<section class="health {{ d.state }}" aria-labelledby="health-title">
+  <p class="health-kicker">Book health · {{ d.today | day }}</p>
+  <h1 class="health-title" id="health-title"><span class="seal" aria-hidden="true"></span>{{ d.title }}</h1>
+  <p class="health-summary">{{ d.summary }}</p>
+  <dl class="facts">
+    <div><dt>Transactions imported through</dt><dd>{{ d.coverage_through | day if d.coverage_through else 'Incomplete' }}</dd></div>
+    <div><dt>Balances verified through</dt><dd>{{ d.verified_through | day if d.verified_through else 'Not verified' }}</dd></div>
+    <div><dt>Ledger</dt><dd>{% if d.ledger_errors %}{{ status('error', d.ledger_errors ~ ' error' ~ ('s' if d.ledger_errors != 1 else '')) }}{% else %}Valid{% endif %}</dd></div>
+  </dl>
+</section>
+
+<section class="section" aria-labelledby="actions-heading">
+  <div class="section-head"><h2 id="actions-heading">What to do next</h2>
+    {% if d.actions %}<span class="aside">{{ d.actions | length }} item{{ 's' if d.actions | length != 1 }}, most urgent first</span>{% endif %}
+  </div>
+  {% if d.actions %}
+    <ol class="actions">
+      {% for action in d.actions %}
+        <li class="action{{ ' lead' if loop.first }}">
+          <div class="action-body">
+            <p class="action-title">{{ action.title }}</p>
+            {% if action.detail %}<p class="action-detail">{{ action.detail }}</p>{% endif %}
+            {% if action.account_key and action.kind == 'statement' %}
+              {{ dropzone(action.account_key, action.account_name, action.accept, action.formats, url_for('overview')) }}
+            {% endif %}
+            {% if action.href or action.agent_prompt %}
+              <div class="action-tools">
+                {% if action.href %}<a class="button small" href="{{ action.href }}">{{ action.link_label or 'Open' }}</a>{% endif %}
+                {% if action.agent_prompt %}{{ prompt_chip(action.agent_prompt) }}{% endif %}
+              </div>
+            {% endif %}
+          </div>
+        </li>
+      {% endfor %}
+    </ol>
+  {% else %}
+    <p class="all-clear">Nothing needs attention. Every active account is imported and verified{% if d.verified_through %} through {{ d.verified_through | day }}{% endif %}.</p>
+  {% endif %}
+</section>
+
+{% if d.active or d.inactive %}
+<section class="section" aria-labelledby="coverage-heading">
+  <div class="section-head"><h2 id="coverage-heading">Account coverage</h2>
+    <a class="aside" href="{{ url_for('accounts') }}">Manage accounts</a></div>
+  {% if d.active %}
+  <div class="table-wrap" role="region" aria-labelledby="coverage-heading" tabindex="0">
+    <table class="responsive">
+      <thead><tr>
+        <th scope="col">Account</th><th scope="col">Last 12 months</th>
+        <th scope="col">Last transaction</th><th scope="col">Verified balance</th><th scope="col">Status</th>
+      </tr></thead>
+      <tbody>
+        {% for row in d.active %}
+          <tr>
+            <td class="wide"><span class="account-name">{{ row.name }}</span><span class="account-path">{{ row.account }}</span></td>
+            <td class="wide" data-label="Last 12 months">{{ strip(row.months) }}{% if loop.last %}{{ strip_months(row.months) }}{% endif %}</td>
+            <td data-label="Last transaction">{{ row.last_transaction | day }}</td>
+            <td data-label="Verified balance">{{ row.last_verified | day }}</td>
+            <td data-label="Status">{{ status(row.tone, row.label ~ (' · ' ~ row.days_stale ~ ' days' if row.days_stale and row.state != 'current' else '')) }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <ul class="strip-legend" aria-label="Coverage key">
+    <li><i class="verified"></i>Verified by a statement balance</li>
+    <li><i class="imported"></i>Imported, not yet verified</li>
+    <li><i class="missing"></i>Missing</li>
+  </ul>
+  {% endif %}
+  {% if d.inactive %}
+    <p><button type="button" class="disclosure" aria-expanded="false" aria-controls="inactive-accounts" data-disclosure>
+      {{ d.inactive | length }} dormant or closed account{{ 's' if d.inactive | length != 1 }}</button></p>
+    <div id="inactive-accounts" hidden>
+      <table class="responsive">
+        <thead><tr><th scope="col">Account</th><th scope="col">Last transaction</th><th scope="col">Status</th></tr></thead>
+        <tbody>
+          {% for row in d.inactive %}
+            <tr>
+              <td class="wide"><span class="account-name">{{ row.name }}</span><span class="account-path">{{ row.account }}</span></td>
+              <td data-label="Last transaction">{{ row.last_transaction | day }}</td>
+              <td data-label="Status">{{ status(row.tone, row.label) }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+</section>
+{% endif %}
+
+<section class="section" aria-labelledby="snapshot-heading">
+  <div class="section-head">
+    <h2 id="snapshot-heading">Financial snapshot</h2>
+    <nav class="periods" aria-label="Period">
+      {% for key, label in d.periods %}
+        <a href="{{ url_for('overview', period=key) }}"{% if d.period.key == key %} aria-current="true"{% endif %}>{{ label }}</a>
+      {% endfor %}
+    </nav>
+  </div>
+  {% set m = d.metrics %}
+  <dl class="figures">
+    <div class="figure"><dt>Cash</dt><dd>{{ m.cash | money }} <small>{{ cur }}</small></dd><span class="basis">As of today</span></div>
+    <div class="figure"><dt>Revenue</dt><dd>{{ m.revenue | money }} <small>{{ cur }}</small></dd><span class="basis">{{ d.period.label }}</span></div>
+    <div class="figure"><dt>Expenses</dt><dd>{{ m.expenses | money }} <small>{{ cur }}</small></dd><span class="basis">{{ d.period.label }}</span></div>
+    <div class="figure"><dt>Net income</dt><dd class="{{ 'negative' if m.net_income < 0 }}">{{ m.net_income | money }} <small>{{ cur }}</small>{% if m.net_income < 0 %}<span class="visually-hidden"> (loss)</span>{% endif %}</dd><span class="basis">{{ d.period.label }}</span></div>
+    <div class="figure"><dt>Receivables</dt><dd>{{ m.receivable | money }} <small>{{ cur }}</small></dd><span class="basis">Unpaid invoices</span></div>
+    <div class="figure"><dt>Needs review</dt><dd>{{ m.needs_review }}</dd><span class="basis">Flagged or uncategorized</span></div>
+  </dl>
+  <p class="muted" style="font-size:13px;margin-top:12px">Figures reflect the ledger as loaded. They are only as current as the coverage above.</p>
+
+  {% if chart %}
+  <figure class="chart" data-chart>
+    <figcaption class="visually-hidden">Month-end cash balance, last {{ chart.points | length }} months, {{ cur }}</figcaption>
+    <h3 style="font-size:14px;margin-bottom:8px">Cash balance by month <span class="muted" style="font-weight:400">· {{ cur }}</span></h3>
+    <svg viewBox="0 0 {{ chart.width }} {{ chart.height }}" role="img" aria-label="Line chart of month-end cash balance. Latest {{ chart.points[-1].value }} {{ cur }} in {{ chart.points[-1].month }}.">
+      <g class="grid axis">
+        {% for tick in chart.ticks %}
+          <line class="{{ 'zero' if tick.zero }}" x1="{{ chart.left }}" x2="{{ chart.right }}" y1="{{ tick.y }}" y2="{{ tick.y }}"></line>
+          <text x="{{ chart.left - 8 }}" y="{{ tick.y + 4 }}" text-anchor="end">{{ tick.label }}</text>
+        {% endfor %}
+        {% for month in chart.months %}
+          <text x="{{ month.x }}" y="{{ chart.height - 6 }}" text-anchor="{{ month.anchor }}">{{ month.label }}</text>
+        {% endfor %}
+      </g>
+      <path class="area" d="{{ chart.area }}"></path>
+      <path class="line" d="{{ chart.line }}"></path>
+      <circle class="end-dot" cx="{{ chart.end.x }}" cy="{{ chart.end.y }}" r="4.5"></circle>
+      <text class="end-label" x="{{ chart.end.x + 10 }}" y="{{ chart.end.y + 4 }}">{{ chart.points[-1].value }}</text>
+      <line class="crosshair" data-crosshair y1="14" y2="{{ chart.height - 28 }}" hidden></line>
+      <circle class="hover-dot" data-hover-dot r="4.5" hidden></circle>
+    </svg>
+    <script type="application/json" data-chart-points>{{ chart.points | tojson }}</script>
+    <details class="data-table">
+      <summary>Show as table</summary>
+      <table>
+        <thead><tr><th scope="col">Month</th><th scope="col" class="num">Cash balance ({{ cur }})</th></tr></thead>
+        <tbody>{% for point in chart.points %}<tr><td>{{ point.month }}</td><td class="num">{{ point.value }}</td></tr>{% endfor %}</tbody>
+      </table>
+    </details>
+  </figure>
+  {% endif %}
+  <p style="margin-top:20px"><a href="/reports/">Open full reports</a> · income statement, balance sheet, journal, documents, and queries.</p>
+</section>
+{% endblock %}

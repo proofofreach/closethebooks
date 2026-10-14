@@ -1,0 +1,24 @@
+__pycache__/
+*.pyc
+.DS_Store
+.venv/
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+
+# Company data never belongs in the product repository. Workspaces live
+# in their own directories (see `books init`); these patterns are a backstop.
+.env
+tokens.json
+*.db
+inbox/
+secrets/
+reports/
+ledger/
+backup_output/
+vendor/
+books-demo/
+books.toml
+sources.toml
+proposed.beancount

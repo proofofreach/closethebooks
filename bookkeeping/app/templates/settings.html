@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Settings</h1>
+    <p>Saved to <span class="mono">{{ workspace.relative(workspace.config_path) }}</span>. The ledger's own title does not change.</p>
+  </div>
+</div>
+<div class="settings-grid">
+  <form method="post" novalidate>
+    <input type="hidden" name="csrf" value="{{ csrf_token }}">
+    {% if errors %}<div class="form-errors" role="alert">{% for error in errors %}<p>{{ error }}</p>{% endfor %}</div>{% endif %}
+    <div class="section-head"><h2>Company</h2></div>
+    <div class="field"><label for="name">Name</label><input id="name" name="name" type="text" required value="{{ company.name }}"></div>
+    <div class="field"><label for="legal_name">Legal name <span class="muted" style="font-weight:400">(optional)</span></label><input id="legal_name" name="legal_name" type="text" value="{{ company.legal_name }}"><p class="hint">Shown on invoices when set.</p></div>
+    <div class="field-row">
+      <div class="field"><label for="entity">Entity type</label><input id="entity" name="entity" type="text" value="{{ company.entity }}" placeholder="Single-member LLC"></div>
+      <div class="field"><label for="email">Email</label><input id="email" name="email" type="email" value="{{ company.email }}"></div>
+    </div>
+    <div class="field"><label for="address">Address</label><textarea id="address" name="address" rows="3">{{ company.address | join('\n') }}</textarea><p class="hint">One line per row.</p></div>
+
+    <div class="section-head" style="margin-top:32px"><h2>Invoices</h2></div>
+    <div class="field-row">
+      <div class="field"><label for="prefix">Number prefix</label><input id="prefix" name="prefix" type="text" class="mono" value="{{ workspace.invoicing.prefix }}"><p class="hint">Numbers look like {{ workspace.invoicing.prefix }}-20260714-1.</p></div>
+      <div class="field"><label for="due_days">Payment terms (days)</label><input id="due_days" name="due_days" type="number" min="0" value="{{ workspace.invoicing.due_days }}"></div>
+    </div>
+    <div class="field"><label for="payment_instructions">Payment instructions</label><textarea id="payment_instructions" name="payment_instructions" rows="3">{{ workspace.invoicing.payment_instructions }}</textarea></div>
+    <div class="field"><label for="notes">Closing note</label><input id="notes" name="notes" type="text" value="{{ workspace.invoicing.notes }}"></div>
+    <div class="form-actions"><button class="button primary" type="submit">Save settings</button></div>
+  </form>
+
+  <aside aria-labelledby="workspace-heading">
+    <div class="section-head"><h2 id="workspace-heading">Workspace</h2></div>
+    <dl class="kv">
+      <dt>Folder</dt><dd class="mono">{{ workspace.root }}</dd>
+      <dt>Currency</dt><dd>{{ workspace.currency }}</dd>
+      <dt>Ledger</dt><dd class="mono">{{ workspace.relative(workspace.ledger_main) }}</dd>
+      <dt>Accounts</dt><dd class="mono">{{ workspace.relative(workspace.sources_file) }}</dd>
+      <dt>Inbox</dt><dd class="mono">{{ workspace.relative(workspace.inbox) }}/</dd>
+    </dl>
+    <div class="section-head" style="margin-top:32px"><h2>Account roles</h2></div>
+    <dl class="kv">
+      <dt>Cash</dt><dd class="mono">{{ workspace.chart.cash_prefixes | join(', ') }}</dd>
+      <dt>Cards</dt><dd class="mono">{{ workspace.chart.card_prefixes | join(', ') }}</dd>
+      <dt>Receivable</dt><dd class="mono">{{ workspace.chart.receivable }}</dd>
+      <dt>Sales income</dt><dd class="mono">{{ workspace.chart.sales_income }}</dd>
+      <dt>Transfers</dt><dd class="mono">{{ workspace.chart.transfer_clearing }}</dd>
+      <dt>Uncategorized</dt><dd class="mono">{{ workspace.chart.uncategorized_expense }}, {{ workspace.chart.uncategorized_income }}</dd>
+    </dl>
+    <div class="section-head" style="margin-top:32px"><h2>Migration</h2></div>
+    <p><a href="{{ url_for('migrate') }}">Move from Xero</a>: back up, convert, and verify an existing Xero organisation.</p>
+    <p class="hint" style="margin-top:12px">Change currency and account roles in <span class="mono">books.toml</span> under <span class="mono">[company]</span> and <span class="mono">[chart]</span>, then restart the app.</p>
+  </aside>
+</div>
+{% endblock %}

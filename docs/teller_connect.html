@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Teller connection | Books</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --canvas: light-dark(#f4f1ea, #1d211f);
+      --surface: light-dark(#fbf9f4, #252a27);
+      --surface-raised: light-dark(#ffffff, #2c322e);
+      --ink: light-dark(#202721, #edf1ec);
+      --muted: light-dark(#59645c, #b7c0b9);
+      --border: light-dark(#ccd2cc, #485149);
+      --accent: light-dark(#176b49, #6bc495);
+      --accent-ink: light-dark(#f7fbf8, #102419);
+      --warning-bg: light-dark(#fff5d8, #3b321c);
+      --warning-border: light-dark(#b77808, #d8a94f);
+      --danger: light-dark(#a53a32, #ff8c83);
+      --focus: light-dark(#075fcc, #87b8ff);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--canvas); color: var(--ink); line-height: 1.5; }
+    main { width: min(100% - 32px, 680px); margin: 48px auto; }
+    h1 { margin: 0 0 8px; font-size: clamp(1.7rem, 5vw, 2.25rem); line-height: 1.15; }
+    h2 { margin: 0 0 12px; font-size: 1.15rem; }
+    p { max-width: 68ch; }
+    .lede { color: var(--muted); margin: 0 0 28px; }
+    .notice, .panel { border: 1px solid var(--border); border-radius: 12px; }
+    .notice { background: var(--warning-bg); border-color: var(--warning-border); padding: 16px; margin-bottom: 20px; }
+    .notice strong { display: block; margin-bottom: 4px; }
+    .notice p { margin: 0; }
+    .panel { background: var(--surface); padding: 22px; }
+    .field { display: grid; gap: 7px; margin-top: 18px; }
+    label, legend { font-weight: 650; }
+    input[type="text"] { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-raised); color: var(--ink); font: inherit; }
+    input::placeholder { color: var(--muted); }
+    .help { margin: 0; color: var(--muted); font-size: 0.875rem; }
+    fieldset { border: 0; padding: 0; margin: 18px 0 0; }
+    .mode-options { display: grid; gap: 8px; margin-top: 8px; }
+    .mode-options label { display: flex; gap: 10px; align-items: flex-start; min-height: 44px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-weight: 500; }
+    .mode-options input { margin-top: 4px; }
+    button { min-height: 44px; border: 1px solid transparent; border-radius: 8px; padding: 10px 16px; background: var(--accent); color: var(--accent-ink); font: inherit; font-weight: 700; cursor: pointer; touch-action: manipulation; }
+    button:hover:not(:disabled) { filter: brightness(1.08); }
+    button.secondary { background: transparent; border-color: var(--border); color: var(--ink); }
+    button:disabled { cursor: not-allowed; opacity: 0.55; }
+    :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+    .error { color: var(--danger); min-height: 1.5em; margin: 8px 0 0; }
+    #status { margin-top: 18px; }
+    #result { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border); }
+    #token-preview { overflow-wrap: anywhere; padding: 12px; border-radius: 8px; background: var(--surface-raised); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    [hidden] { display: none !important; }
+    @media (max-width: 520px) {
+      main { margin: 24px auto; }
+      .panel { padding: 18px; }
+      .actions { display: grid; }
+      .actions button { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Connect a bank through Teller</h1>
+    <p class="lede">A one-time connection for importing read-only balances and posted transactions into your books.</p>
+
+    <section class="notice" aria-labelledby="availability-title">
+      <strong id="availability-title">New Teller accounts are currently unavailable</strong>
+      <p>Teller removed public signup in July 2026. Continue only if Teller support has already granted you an account and application ID. Otherwise, use statement imports.</p>
+    </section>
+
+    <section class="panel" aria-labelledby="connection-title">
+      <h2 id="connection-title">Connection details</h2>
+      <form id="connect-form" novalidate>
+        <fieldset>
+          <legend>What do you need to do?</legend>
+          <div class="mode-options">
+            <label><input type="radio" name="mode" value="new" checked> Connect a new bank enrollment</label>
+            <label><input type="radio" name="mode" value="reauth"> Re-authenticate an existing enrollment</label>
+          </div>
+        </fieldset>
+
+        <div class="field">
+          <label for="appid">Teller application ID</label>
+          <input id="appid" name="application_id" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="app_…" aria-describedby="appid-help appid-error" required>
+          <p class="help" id="appid-help">Find this in the Teller dashboard. It normally begins with <code>app_</code>.</p>
+          <p class="error" id="appid-error"></p>
+        </div>
+
+        <div class="field" id="enrollment-field" hidden>
+          <label for="enrollment">Existing enrollment ID</label>
+          <input id="enrollment" name="enrollment_id" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="enr_…" aria-describedby="enrollment-help enrollment-error">
+          <p class="help" id="enrollment-help">Reusing the ID avoids consuming another enrollment from Teller’s lifetime allowance.</p>
+          <p class="error" id="enrollment-error"></p>
+        </div>
+
+        <div class="actions">
+          <button id="connect" type="submit">Open Teller Connect</button>
+        </div>
+      </form>
+
+      <p id="status" role="status" aria-live="polite"></p>
+
+      <section id="result" aria-labelledby="result-title" hidden>
+        <h2 id="result-title">Enrollment created</h2>
+        <p>Copy this entry into <code>secrets/teller/tokens.json</code>. Treat it like a password.</p>
+        <div id="token-preview"></div>
+        <div class="actions">
+          <button id="copy-token" type="button">Copy token entry</button>
+          <button id="reveal-token" class="secondary" type="button" aria-pressed="false">Reveal token</button>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script src="https://cdn.teller.io/connect/connect.js"></script>
+  <script>
+    (function () {
+      const form = document.getElementById("connect-form");
+      const appId = document.getElementById("appid");
+      const enrollment = document.getElementById("enrollment");
+      const enrollmentField = document.getElementById("enrollment-field");
+      const connect = document.getElementById("connect");
+      const status = document.getElementById("status");
+      const result = document.getElementById("result");
+      const preview = document.getElementById("token-preview");
+      const resultTitle = document.getElementById("result-title");
+      const copy = document.getElementById("copy-token");
+      const reveal = document.getElementById("reveal-token");
+      let tokenEntry = null;
+      let tokenVisible = false;
+
+      function selectedMode() {
+        return form.elements.mode.value;
+      }
+
+      function showMode() {
+        const reauth = selectedMode() === "reauth";
+        enrollmentField.hidden = !reauth;
+        enrollment.required = reauth;
+        enrollment.value = reauth ? enrollment.value : "";
+        document.getElementById("enrollment-error").textContent = "";
+      }
+
+      function validate() {
+        let valid = true;
+        const appValue = appId.value.trim();
+        const enrollmentValue = enrollment.value.trim();
+        const appError = document.getElementById("appid-error");
+        const enrollmentError = document.getElementById("enrollment-error");
+        appError.textContent = "";
+        enrollmentError.textContent = "";
+
+        if (!/^app_[A-Za-z0-9_-]+$/.test(appValue)) {
+          appError.textContent = "Enter a Teller application ID beginning with app_.";
+          appId.focus();
+          valid = false;
+        } else if (selectedMode() === "reauth" && !enrollmentValue) {
+          enrollmentError.textContent = "Enter the enrollment ID you want to re-authenticate.";
+          enrollment.focus();
+          valid = false;
+        }
+        return valid;
+      }
+
+      function maskedToken() {
+        if (!tokenEntry) return "";
+        const token = tokenEntry.access_token;
+        const safeToken = token.length > 12 ? token.slice(0, 8) + "…" + token.slice(-4) : "••••••••";
+        return JSON.stringify({ ...tokenEntry, access_token: tokenVisible ? token : safeToken }, null, 2);
+      }
+
+      function renderToken() {
+        preview.textContent = maskedToken();
+        reveal.textContent = tokenVisible ? "Hide token" : "Reveal token";
+        reveal.setAttribute("aria-pressed", String(tokenVisible));
+      }
+
+      form.addEventListener("change", function (event) {
+        if (event.target.name === "mode") showMode();
+      });
+
+      form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        result.hidden = true;
+        status.textContent = "";
+        if (!validate()) return;
+        if (!window.TellerConnect) {
+          status.textContent = "Teller Connect could not load. Check your connection and try again.";
+          return;
+        }
+
+        connect.disabled = true;
+        connect.textContent = "Opening…";
+        status.textContent = "Opening Teller Connect securely…";
+        const isReauth = selectedMode() === "reauth";
+        const config = {
+          applicationId: appId.value.trim(),
+          environment: "development",
+          products: ["transactions", "balance"],
+          onSuccess: function (response) {
+            tokenEntry = {
+              name: response.enrollment.institution.name.toLowerCase(),
+              access_token: response.accessToken,
+              enrollment_id: response.enrollment.id,
+            };
+            tokenVisible = false;
+            renderToken();
+            result.hidden = false;
+            resultTitle.textContent = isReauth ? "Enrollment re-authenticated" : "Enrollment created";
+            status.textContent = isReauth
+              ? "Bank access renewed. Save the updated token entry before closing this page."
+              : "Bank connected. Save the token entry before closing this page.";
+            connect.disabled = false;
+            connect.textContent = selectedMode() === "reauth" ? "Re-authenticate again" : "Connect another bank";
+          },
+          onExit: function () {
+            if (result.hidden) {
+              status.textContent = isReauth
+                ? "Teller Connect closed before re-authentication completed."
+                : "Teller Connect closed without creating a new enrollment.";
+            }
+            connect.disabled = false;
+            connect.textContent = "Open Teller Connect";
+          },
+        };
+        if (selectedMode() === "reauth") config.enrollmentId = enrollment.value.trim();
+        try {
+          TellerConnect.setup(config).open();
+        } catch (error) {
+          status.textContent = "Teller Connect could not open. Verify the application ID and try again.";
+          connect.disabled = false;
+          connect.textContent = "Open Teller Connect";
+        }
+      });
+
+      copy.addEventListener("click", async function () {
+        if (!tokenEntry) return;
+        try {
+          await navigator.clipboard.writeText(JSON.stringify(tokenEntry, null, 2));
+          status.textContent = "Token entry copied. Paste it into secrets/teller/tokens.json.";
+        } catch (error) {
+          tokenVisible = true;
+          renderToken();
+          status.textContent = "Copy was blocked. The token is revealed so you can copy it manually.";
+        }
+      });
+
+      reveal.addEventListener("click", function () {
+        tokenVisible = !tokenVisible;
+        renderToken();
+      });
+
+      showMode();
+    })();
+  </script>
+</body>
+</html>

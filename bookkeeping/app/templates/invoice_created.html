@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% from "_macros.html" import prompt_chip %}
+{% block content %}
+{% set inv = result.invoice %}
+<div class="page-head">
+  <div>
+    <h1>Invoice {{ inv.number }} created</h1>
+    <p>{{ inv.total | money(workspace.currency) }} to {{ inv.client }}, due {{ inv.due_date | day }}. The document is saved; the receivable is not posted yet.</p>
+  </div>
+  <a class="button primary" href="{{ url_for('document', filename=document_url) }}" target="_blank" rel="noopener">Open document</a>
+</div>
+<section aria-labelledby="send-heading">
+  <div class="section-head"><h2 id="send-heading">1. Send it</h2></div>
+  <p class="lede">Open the document, print it to PDF from your browser, and send it yourself. Saved at <span class="mono">{{ workspace.relative(result.document) }}</span>.</p>
+</section>
+<section class="section" aria-labelledby="record-heading">
+  <div class="section-head"><h2 id="record-heading">2. Record the receivable</h2>
+    <button type="button" class="copy-button" data-copy="{{ result.entry }}">Copy entry</button></div>
+  <p class="lede">Append this entry to <span class="mono">{{ year_file }}</span>, or hand it to your coding agent, then validate and commit.</p>
+  <pre class="entry">{{ result.entry }}</pre>
+  <div class="handoff"><p>Your agent can record it and run the checks for you.</p>{{ prompt_chip('Record invoice ' ~ inv.number) }}</div>
+</section>
+<p style="margin-top:32px"><a href="{{ url_for('invoices') }}">Back to invoices</a></p>
+{% endblock %}

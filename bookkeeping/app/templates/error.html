@@ -1,0 +1,5 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head"><div><h1>{{ title }}</h1><p>{{ message }}</p></div></div>
+<p><a class="button" href="{{ url_for('overview') }}">Back to overview</a></p>
+{% endblock %}

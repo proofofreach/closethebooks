@@ -1,0 +1,41 @@
+{% macro prompt_chip(prompt) -%}
+  <span class="prompt-chip">
+    <span>Ask your coding agent</span>
+    <q data-copy-source>{{ prompt }}</q>
+    <button type="button" class="copy-button" data-copy="{{ prompt }}" aria-label="Copy “{{ prompt }}”">Copy</button>
+  </span>
+{%- endmacro %}
+
+{% macro dropzone(key, name, accept, formats, next_url) -%}
+  {% set id = 'drop-' ~ key %}
+  <form class="dropzone" data-dropzone action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data">
+    <input type="hidden" name="csrf" value="{{ csrf_token }}">
+    <input type="hidden" name="account_key" value="{{ key }}">
+    <input type="hidden" name="next" value="{{ next_url }}">
+    <div class="dropzone-copy">
+      <strong>Drop the {{ name }} statement here</strong>
+      <span id="{{ id }}-formats">{{ formats }}, up to 20 MB. Saved to this workspace's inbox only.</span>
+    </div>
+    <label class="button" for="{{ id }}-file">Choose file</label>
+    <input id="{{ id }}-file" type="file" name="statement" accept="{{ accept }}" aria-describedby="{{ id }}-formats">
+    <noscript><button class="button" type="submit">Upload</button></noscript>
+    <p class="dropzone-status" role="status" aria-live="polite"></p>
+  </form>
+{%- endmacro %}
+
+{% macro status(tone, label) -%}
+  <span class="status {{ tone }}">{{ label }}</span>
+{%- endmacro %}
+
+{% macro strip(months) -%}
+  <ul class="strip" aria-label="Last 12 months">
+    {% for short, long, state in months %}
+      {% set words = {'verified': 'verified', 'imported': 'imported, not verified', 'missing': 'missing', 'before': 'before tracking'} %}
+      <li class="{{ state }}" title="{{ long }}: {{ words[state] }}"><span class="visually-hidden">{{ long }}: {{ words[state] }}</span></li>
+    {% endfor %}
+  </ul>
+{%- endmacro %}
+
+{% macro strip_months(months) -%}
+  <div class="strip-months" aria-hidden="true">{% for short, long, state in months %}<span>{{ short }}</span>{% endfor %}</div>
+{%- endmacro %}

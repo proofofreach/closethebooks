@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>{{ title }}</h1>
+    <p>{% if editing %}Changes apply to future imports and status. Past transactions stay as they are.{% else %}The account is opened in the ledger and gets its own statement inbox.{% endif %}</p>
+  </div>
+</div>
+<form class="form-narrow" method="post" novalidate>
+  <input type="hidden" name="csrf" value="{{ csrf_token }}">
+  {% if errors %}<div class="form-errors" role="alert">{% for error in errors %}<p>{{ error }}</p>{% endfor %}</div>{% endif %}
+
+  {% if not editing %}
+  <fieldset>
+    <legend>Kind</legend>
+    <div class="checks">
+      <label class="check"><input type="radio" name="kind" value="bank" {{ 'checked' if values.get('kind', 'bank') == 'bank' }}> Bank or cash account</label>
+      <label class="check"><input type="radio" name="kind" value="card" {{ 'checked' if values.get('kind') == 'card' }}> Credit card</label>
+    </div>
+  </fieldset>
+  {% endif %}
+
+  <div class="field">
+    <label for="name">Name</label>
+    <input id="name" name="name" type="text" required value="{{ values.get('name', '') }}" placeholder="Operating checking" autocomplete="off">
+    <p class="hint">How the account appears in this app, for example the bank's product name.</p>
+  </div>
+  <div class="field">
+    <label for="account">Ledger account {% if not editing %}<span class="muted" style="font-weight:400">(optional)</span>{% endif %}</label>
+    <input id="account" name="account" type="text" class="mono" value="{{ values.get('account', '') }}" {{ 'readonly' if editing }} placeholder="{{ workspace.chart.cash_prefixes[0] }}Operating-Checking" spellcheck="false" autocomplete="off">
+    <p class="hint">{% if editing %}The ledger account cannot be renamed here.{% else %}Leave blank to derive it from the name. Use an existing account to attach imports to it.{% endif %}</p>
+  </div>
+  {% if not editing %}
+  <div class="field-row">
+    <div class="field">
+      <label for="key">Key <span class="muted" style="font-weight:400">(optional)</span></label>
+      <input id="key" name="key" type="text" class="mono" value="{{ values.get('key', '') }}" placeholder="operating-checking" spellcheck="false" autocomplete="off">
+      <p class="hint">Short label used in statement filenames.</p>
+    </div>
+    <div class="field">
+      <label for="opened">Track from</label>
+      <input id="opened" name="opened" type="date" value="{{ values.get('opened', '') }}">
+      <p class="hint">First day to import. Defaults to today.</p>
+    </div>
+  </div>
+  {% endif %}
+
+  <fieldset>
+    <legend>Statement formats</legend>
+    <div class="checks">
+      {% set chosen = values.get('statement_extensions') or ['csv', 'ofx', 'qfx', 'qbo'] %}
+      {% for fmt in formats %}
+        <label class="check"><input type="checkbox" name="formats" value="{{ fmt }}" {{ 'checked' if fmt in chosen }}> {{ fmt | upper }}</label>
+      {% endfor %}
+    </div>
+    <p class="hint">PDF needs a parser that reconciles the statement's balances.</p>
+  </fieldset>
+  <div class="field">
+    <label for="preset">PDF parser</label>
+    <select id="preset" name="preset">
+      <option value="">None</option>
+      {% for value, label in presets.items() %}<option value="{{ value }}" {{ 'selected' if values.get('statement_preset') == value }}>{{ label }}</option>{% endfor %}
+    </select>
+  </div>
+
+  <div class="field-row">
+    <div class="field">
+      <label for="cadence">Statement expected every</label>
+      <input id="cadence" name="cadence" type="number" min="1" inputmode="numeric" value="{{ values.get('expected_cadence_days', 35) }}">
+      <p class="hint">Days. Marked “Update due” after this.</p>
+    </div>
+    <div class="field">
+      <label for="overdue">Overdue after</label>
+      <input id="overdue" name="overdue" type="number" min="1" inputmode="numeric" value="{{ values.get('overdue_after_days', 90) }}">
+      <p class="hint">Days without new transactions.</p>
+    </div>
+  </div>
+
+  <fieldset>
+    <legend>Status</legend>
+    <div class="checks">
+      {% for value, label in [('active', 'Active'), ('dormant', 'Dormant'), ('closed', 'Closed')] %}
+        <label class="check"><input type="radio" name="lifecycle" value="{{ value }}" {{ 'checked' if values.get('lifecycle', 'active') == value }}> {{ label }}</label>
+      {% endfor %}
+    </div>
+    <p class="hint">Only active accounts count toward book health. Age never changes this.</p>
+  </fieldset>
+
+  <div class="form-actions">
+    <button class="button primary" type="submit">{{ 'Save changes' if editing else 'Add account' }}</button>
+    <a class="button quiet" href="{{ url_for('accounts') }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

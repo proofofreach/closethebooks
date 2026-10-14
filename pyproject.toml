@@ -1,0 +1,44 @@
+[project]
+name = "xeroxd-books"
+version = "0.3.0"
+description = "Local-first, AI-assisted bookkeeping for small businesses on a plain-text Beancount ledger"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = ">=3.11"
+dependencies = [
+    "beancount>=3",
+    "beanquery>=0.2",
+    "fava>=1.30",
+    "flask>=3",
+    "pypdf>=5",
+]
+
+[project.optional-dependencies]
+xero = ["xero-python"]
+dev = [
+    "beautifulsoup4>=4.12",
+    "pytest>=8",
+]
+
+[project.scripts]
+books = "bookkeeping.__main__:main"
+xero-backup = "xero_absolute_backup.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["bookkeeping*", "xero_absolute_backup*"]
+
+[tool.setuptools.package-data]
+bookkeeping = [
+    "app/templates/*.html",
+    "app/static/*",
+    "templates/workspace/*.md",
+    "templates/workspace/skills/*/SKILL.md",
+]
+
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

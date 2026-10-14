@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>New invoice</h1>
+    <p>Creates the invoice document and the ledger entry for its receivable. The entry is posted only after you or your agent review it.</p>
+  </div>
+</div>
+<form class="form-narrow" method="post" novalidate data-invoice-form>
+  <input type="hidden" name="csrf" value="{{ csrf_token }}">
+  {% if errors %}<div class="form-errors" role="alert">{% for error in errors %}<p>{{ error }}</p>{% endfor %}</div>{% endif %}
+  <div class="field">
+    <label for="client">Client</label>
+    <input id="client" name="client" type="text" required value="{{ form.get('client', '') }}" autocomplete="organization">
+  </div>
+  <div class="field">
+    <label for="address">Client address <span class="muted" style="font-weight:400">(optional)</span></label>
+    <textarea id="address" name="address" rows="3">{{ form.get('address', '') }}</textarea>
+    <p class="hint">One line per row.</p>
+  </div>
+
+  <fieldset>
+    <legend>Line items · {{ workspace.currency }}</legend>
+    <div class="line-items" data-line-items>
+      {% set items = form.getlist('item') or [''] %}
+      {% set amounts = form.getlist('amount') or [''] %}
+      {% for item in items %}
+      <div class="line-item">
+        <input name="item" type="text" aria-label="Description, line {{ loop.index }}" placeholder="Description" value="{{ item }}">
+        <input name="amount" type="text" inputmode="decimal" aria-label="Amount, line {{ loop.index }}" placeholder="0.00" class="num" value="{{ amounts[loop.index0] if amounts | length > loop.index0 else '' }}">
+        <button type="button" class="remove-line" data-remove-line aria-label="Remove line {{ loop.index }}">×</button>
+      </div>
+      {% endfor %}
+    </div>
+    <button type="button" class="button quiet" data-add-line>+ Add line</button>
+    <div class="line-total"><span>Total</span><span data-invoice-total>—</span></div>
+  </fieldset>
+
+  <div class="field-row">
+    <div class="field">
+      <label for="date">Invoice date</label>
+      <input id="date" name="date" type="date" value="{{ form.get('date') or today.isoformat() }}">
+    </div>
+    <div class="field">
+      <label for="due_days">Payment due in</label>
+      <input id="due_days" name="due_days" type="number" min="0" inputmode="numeric" value="{{ form.get('due_days') or workspace.invoicing.due_days }}">
+      <p class="hint">Days after the invoice date.</p>
+    </div>
+  </div>
+  <div class="field">
+    <label for="notes">Notes on the invoice</label>
+    <textarea id="notes" name="notes" rows="3">{{ form.get('notes', default_notes) }}</textarea>
+  </div>
+  <p class="muted" style="font-size:13px">Number: <span class="mono">{{ next_number }}</span> (assigned on save). From: {{ company.display_name }}{% if company.email %}, {{ company.email }}{% endif %}. <a href="{{ url_for('settings') }}">Change</a></p>
+  <div class="form-actions">
+    <button class="button primary" type="submit">Create invoice</button>
+    <a class="button quiet" href="{{ url_for('invoices') }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

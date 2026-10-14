@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% from "_macros.html" import status, strip %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Accounts</h1>
+    <p>Each bank or card account the business uses: where its transactions come from, how often a statement is due, and how far it is verified.</p>
+  </div>
+  <a class="button primary" href="{{ url_for('account_new') }}">Add account</a>
+</div>
+
+{% set rows = d.active + d.inactive %}
+{% if rows %}
+<div class="table-wrap">
+  <table class="responsive">
+    <thead><tr>
+      <th scope="col">Account</th><th scope="col">Source</th><th scope="col">Statement every</th>
+      <th scope="col">Last 12 months</th><th scope="col">Status</th><th scope="col"><span class="visually-hidden">Actions</span></th>
+    </tr></thead>
+    <tbody>
+    {% for row in rows %}
+      {% set source = sources[row.key] %}
+      <tr>
+        <td class="wide"><span class="account-name">{{ row.name }}</span><span class="account-path">{{ row.account }} · key <b>{{ row.key }}</b></span></td>
+        <td data-label="Source">{{ {'statement': 'Statements', 'plaid': 'Plaid feed', 'teller': 'Teller feed'}[row.ingestion] }}<span class="account-path">{{ row.formats | join(', ') | upper }}</span></td>
+        <td data-label="Statement every">{{ source.expected_cadence_days }} days</td>
+        <td class="wide" data-label="Last 12 months">{{ strip(row.months) }}</td>
+        <td data-label="Status">{{ status(row.tone, row.label) }}</td>
+        <td data-label=""><a class="button small" href="{{ url_for('account_edit', key=row.key) }}" aria-label="Edit {{ row.name }}">Edit</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty">
+  <p>No accounts yet. Add each bank account and credit card the business uses. Every account gets its own statement inbox, coverage status, and balance verification.</p>
+  <a class="button primary" href="{{ url_for('account_new') }}">Add your first account</a>
+</div>
+{% endif %}
+
+<section class="section" aria-labelledby="feeds-heading">
+  <div class="section-head"><h2 id="feeds-heading">Bank feeds (optional)</h2></div>
+  <p class="lede">Statements are the dependable path and the only source of verified balances. A Plaid feed can add daily transactions. Connect it from a terminal with <code>books plaid-connect</code>, list account IDs with <code>books plaid-accounts</code>, then register each one with <code>books add-account &lt;key&gt; --ingestion plaid --feed-account-id &lt;id&gt; …</code>.</p>
+</section>
+{% endblock %}

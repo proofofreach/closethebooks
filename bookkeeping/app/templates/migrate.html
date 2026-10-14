@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% from "_macros.html" import status %}
+{% block content %}
+{% set report_ok = m.report and m.report.status == 'verified' %}
+{% set done = {
+  'app': m.client.get('client_id'),
+  'connect': m.connected and m.client.get('tenant_id'),
+  'backup': m.backup_root and m.manifest and m.manifest.status == 'complete',
+  'gl': m.merged_gl,
+  'convert': report_ok,
+  'register': m.sources | length > 0 } %}
+<div class="page-head">
+  <div>
+    <h1>Move from Xero</h1>
+    <p>A one-time migration: back up your Xero organisation, convert its general ledger into this workspace, and prove the result matches Xero to the cent. Xero is only read. Nothing in it changes.</p>
+  </div>
+</div>
+
+<ol class="migration">
+  <li class="step {{ 'done' if done.app }}">
+    <div class="step-head"><h2>1. Create a Xero app</h2>{{ status('current', 'Done') if done.app else status('muted', 'To do') }}</div>
+    <p class="lede">Xero lets only registered apps read your data. Create a free one at <a href="https://developer.xero.com/app/manage" target="_blank" rel="noopener">developer.xero.com</a>: choose <b>Mobile or desktop app</b> (no client secret needed), and set the redirect URI to exactly:</p>
+    <p class="prompt-chip"><span class="mono">{{ m.redirect_uri }}</span><button type="button" class="copy-button" data-copy="{{ m.redirect_uri }}">Copy</button></p>
+    <form method="post" action="{{ url_for('migrate_client') }}" class="inline-form">
+      <input type="hidden" name="csrf" value="{{ csrf_token }}">
+      <div class="field"><label for="client_id">Client ID</label>
+        <input id="client_id" name="client_id" type="text" class="mono" value="{{ m.client.get('client_id', '') }}" autocomplete="off" spellcheck="false" required></div>
+      <div class="field"><label for="client_secret">Client secret <span class="muted" style="font-weight:400">(web apps only)</span></label>
+        <input id="client_secret" name="client_secret" type="text" class="mono" value="" placeholder="{{ 'Saved' if m.client.get('client_secret') else 'Leave blank for desktop apps' }}" autocomplete="off" spellcheck="false"></div>
+      <button class="button" type="submit">Save</button>
+    </form>
+    <p class="hint">Stored only in <span class="mono">{{ workspace.relative(workspace.secrets) }}/xero/</span>, which git ignores.</p>
+  </li>
+
+  <li class="step {{ 'done' if done.connect }}{{ ' locked' if not done.app }}">
+    <div class="step-head"><h2>2. Connect and choose the organisation</h2>{{ status('current', 'Done') if done.connect else status('muted', 'To do') }}</div>
+    {% if not m.connected %}
+      <form method="post" action="{{ url_for('migrate_connect') }}">
+        <input type="hidden" name="csrf" value="{{ csrf_token }}">
+        <button class="button primary" type="submit" {{ 'disabled' if not done.app }}>Sign in to Xero</button>
+        <span class="hint">Opens Xero's own sign-in page, then returns here.</span>
+      </form>
+    {% else %}
+      {% if m.organisation_error %}<p class="flash error">{{ m.organisation_error }}</p>{% endif %}
+      <form method="post" action="{{ url_for('migrate_organisation') }}" class="inline-form">
+        <input type="hidden" name="csrf" value="{{ csrf_token }}">
+        <div class="field"><label for="tenant_id">Organisation</label>
+          <select id="tenant_id" name="tenant_id">
+            {% for org in m.organisations %}<option value="{{ org.id }}" {{ 'selected' if org.id == m.client.get('tenant_id') }}>{{ org.name }}</option>{% endfor %}
+          </select></div>
+        <button class="button" type="submit" {{ 'disabled' if not m.organisations }}>Use this organisation</button>
+      </form>
+      <form method="post" action="{{ url_for('migrate_disconnect') }}">
+        <input type="hidden" name="csrf" value="{{ csrf_token }}">
+        <button class="button quiet" type="submit">Disconnect</button>
+      </form>
+    {% endif %}
+  </li>
+
+  <li class="step {{ 'done' if done.backup }}{{ ' locked' if not done.connect }}">
+    <div class="step-head"><h2>3. Back up the organisation</h2>
+      {% if done.backup %}{{ status('current', 'Done') }}{% elif m.job.state == 'running' %}{{ status('due', 'Running') }}{% elif m.manifest %}{{ status('due', 'Paused') }}{% else %}{{ status('muted', 'To do') }}{% endif %}</div>
+    <p class="lede">Downloads contacts, invoices, bank transactions, the chart of accounts, and every attachment. Large organisations can hit Xero's daily API limit; the backup then pauses and resumes where it stopped.</p>
+    <div data-backup-status data-state="{{ m.job.state }}" role="status" aria-live="polite">
+      <p class="backup-message">{{ m.job.message or (m.manifest and ('Last run: ' ~ m.manifest.status)) or '' }}</p>
+      {% if m.progress %}<p class="hint backup-progress">{{ '{:,}'.format(m.progress.entities) }} records · {{ '{:,}'.format(m.progress.attachments_downloaded) }} of {{ '{:,}'.format(m.progress.attachments_queued) }} attachments</p>{% endif %}
+    </div>
+    <form method="post" action="{{ url_for('migrate_backup') }}">
+      <input type="hidden" name="csrf" value="{{ csrf_token }}">
+      <button class="button primary" type="submit" {{ 'disabled' if not done.connect or m.job.state == 'running' }}>{{ 'Resume backup' if m.manifest and not done.backup else ('Run again' if done.backup else 'Start backup') }}</button>
+    </form>
+  </li>
+
+  <li class="step {{ 'done' if done.gl }}{{ ' locked' if not m.backup_root }}">
+    <div class="step-head"><h2>4. Add the general ledger export</h2>{{ status('current', 'Done') if done.gl else status('muted', 'To do') }}</div>
+    <p class="lede">Xero's API does not provide the full general ledger, so export it once from Xero: <b>Accounting → Reports → General Ledger Detail</b>, set the date range from your first transaction to today, include opening balances, and <b>Export → Excel</b>. Very long histories may need several exports; add them all.</p>
+    <form method="post" action="{{ url_for('migrate_gl') }}" enctype="multipart/form-data" class="inline-form">
+      <input type="hidden" name="csrf" value="{{ csrf_token }}">
+      <div class="field"><label for="gl">General Ledger Detail (.xlsx)</label>
+        <input id="gl" name="gl" type="file" accept=".xlsx" multiple required></div>
+      <button class="button" type="submit" {{ 'disabled' if not m.backup_root }}>Add export</button>
+    </form>
+  </li>
+
+  <li class="step {{ 'done' if done.convert }}{{ ' locked' if not done.gl }}">
+    <div class="step-head"><h2>5. Convert and verify</h2>{{ status('current', 'Verified') if done.convert else (status('overdue', 'Not verified') if m.report else status('muted', 'To do')) }}</div>
+    <p class="lede">Builds the ledger from the general ledger, files attachments next to their transactions, and checks every account's total against Xero.</p>
+    {% if m.blocker and not done.convert %}<p class="hint">{{ m.blocker }}</p>{% endif %}
+    <form method="post" action="{{ url_for('migrate_convert') }}" data-busy-form>
+      <input type="hidden" name="csrf" value="{{ csrf_token }}">
+      <button class="button primary" type="submit" data-busy-label="Converting…" {{ 'disabled' if m.blocker }}>{{ 'Convert again' if m.report else 'Convert' }}</button>
+    </form>
+    {% if m.report %}
+      <dl class="kv" style="margin-top:16px">
+        <dt>Result</dt><dd>{{ status('current', 'Matches Xero') if report_ok else status('overdue', m.report.status) }}</dd>
+        {% for key, value in m.report.items() if key not in ('status',) and value is not mapping and (value is string or value is number) %}
+          <dt>{{ key.replace('_', ' ') | capitalize }}</dt><dd>{{ value }}</dd>
+        {% endfor %}
+        {% if m.report.mismatches %}<dt>Mismatched accounts</dt><dd>{{ m.report.mismatches | length }}: {{ m.report.mismatches[:5] | map(attribute='account', default='?') | join(', ') }}</dd>{% endif %}
+        {% if m.report.bean_check_errors %}<dt>Ledger errors</dt><dd>{{ m.report.bean_check_errors | length }}</dd>{% endif %}
+      </dl>
+    {% endif %}
+  </li>
+
+  <li class="step {{ 'done' if done.register }}{{ ' locked' if not done.convert }}">
+    <div class="step-head"><h2>6. Register bank and card accounts</h2>{{ status('current', 'Done') if done.register else status('muted', 'To do') }}</div>
+    <p class="lede">Every bank and card account from Xero becomes a statement source. Accounts with recent activity start active; the rest start dormant. New imports begin the day after your Xero history ends.</p>
+    <form method="post" action="{{ url_for('migrate_register') }}">
+      <input type="hidden" name="csrf" value="{{ csrf_token }}">
+      <button class="button primary" type="submit" {{ 'disabled' if not done.convert or done.register }}>Register accounts</button>
+      {% if done.register %}<a class="button quiet" href="{{ url_for('accounts') }}">Review accounts</a>{% endif %}
+    </form>
+  </li>
+</ol>
+{% endblock %}

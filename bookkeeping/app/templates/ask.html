@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="ask">
+  <div class="page-head">
+    <div>
+      <h1>Ask the books</h1>
+      <p>Answers come from the ledger, through {% if engines %}the {{ engines | map('capitalize') | join(' or ') }} command-line tool signed in on this computer{% else %}a local AI command-line tool{% endif %}. It can read and query; it cannot change anything.</p>
+    </div>
+    <button type="button" class="button small" data-clear-chat hidden>New conversation</button>
+  </div>
+
+  {% if not engines %}
+    <div class="form-errors" role="alert"><p>No assistant is available. Install the Claude or Codex command-line tool and sign in, then reload this page. Reports and queries still work without it.</p></div>
+  {% endif %}
+
+  <div class="transcript" data-transcript aria-live="polite" aria-relevant="additions" aria-label="Conversation"></div>
+
+  <div class="starters" data-starters>
+    {% set cur = workspace.currency %}
+    {% for prompt in [
+      'Where do we stand? Cash, receivables, and this year\'s net income.',
+      'What were the biggest expense categories this year, and how do they compare with last year?',
+      'Which invoices are unpaid, and how old are they?'] %}
+      <button type="button" class="button small" data-starter="{{ prompt }}">{{ prompt }}</button>
+    {% endfor %}
+  </div>
+
+  <form class="composer" data-ask-form>
+    <label for="question">Question</label>
+    <div class="composer-row">
+      <textarea id="question" name="question" rows="3" required aria-describedby="composer-help" {{ 'disabled' if not engines }}></textarea>
+      <div style="display:flex;gap:8px">
+        <button class="button primary" type="submit" data-send {{ 'disabled' if not engines }}>Ask</button>
+        <button class="button" type="button" data-stop hidden>Stop</button>
+      </div>
+    </div>
+    <p class="scope-note" id="composer-help">Enter sends; Shift+Enter adds a line. Answers usually take 15 to 60 seconds. The question and query results go to the AI provider you are signed in with.</p>
+  </form>
+</div>
+{% endblock %}
