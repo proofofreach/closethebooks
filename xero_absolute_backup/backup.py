@@ -58,6 +58,9 @@ class BackupRunner:
             self.phase_one_fetch_data()
             self.phase_two_discover_attachments()
             self.phase_three_download_attachments()
+            # Attachments found and downloaded after the records phase must
+            # reach attachments_manifest.csv, which conversion reads.
+            self.write_attachment_exports()
             manifest = self.build_manifest(status="complete")
         except RateLimitReached as exc:
             self.state.commit()

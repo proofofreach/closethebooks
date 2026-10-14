@@ -196,3 +196,40 @@ def test_progress_reports_the_current_phase(migration):
     store.commit()
     store.close()
     assert xero.progress()["phase"]["label"] == "Finding attachments"
+
+
+def test_existing_backup_layout_from_books_toml_is_reused(tmp_path):
+    from bookkeeping import tomlwrite
+    from bookkeeping.workspace import load_workspace
+
+    workspace = init_workspace(tmp_path / "ws", name="Legacy Co", git=False)
+    backup = workspace.root / "backup_output" / "legacy-co"
+    write_csv(backup / "csv" / "accounts.csv", ACCOUNTS)
+    (workspace.root / "xero_sync_state.db").write_bytes(b"")
+    config = workspace.config_path.read_text() + '\n[paths]\nxero_backup = "backup_output/legacy-co"\n'
+    workspace.config_path.write_text(config)
+    xero = XeroMigration(load_workspace(workspace.root))
+    assert xero.output_dir == workspace.root / "backup_output"
+    assert xero.state_db == workspace.root / "xero_sync_state.db"
+    assert xero.backup_root() == backup
+
+
+def test_attachment_exports_are_rewritten_after_downloads(tmp_path, monkeypatch):
+    from xero_absolute_backup import backup as backup_module
+    from xero_absolute_backup.backup import BackupRunner
+
+    order = []
+    runner = object.__new__(BackupRunner)
+    runner.output_root = tmp_path
+    for name in ("phase_one_fetch_data", "phase_two_discover_attachments", "phase_three_download_attachments", "write_attachment_exports"):
+        monkeypatch.setattr(runner, name, lambda name=name: order.append(name), raising=False)
+    runner.build_manifest = lambda **kwargs: {"status": kwargs["status"]}
+
+    class FakeState:
+        def commit(self): pass
+        def close(self): pass
+
+    runner.state = FakeState()
+    monkeypatch.setattr(backup_module, "write_manifest", lambda root, manifest: None)
+    runner.run()
+    assert order[-2:] == ["phase_three_download_attachments", "write_attachment_exports"]

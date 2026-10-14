@@ -66,8 +66,19 @@ class XeroMigration:
         self.secret_dir = workspace.secrets / "xero"
         self.client_file = self.secret_dir / "client.json"
         self.token_file = self.secret_dir / "tokens.json"
-        self.output_dir = workspace.root / "imports" / "xero"
-        self.state_db = self.output_dir / "state.db"
+        # A workspace whose books.toml points xero_backup at an existing
+        # backup (for example backup_output/<org>) keeps that layout.
+        configured = workspace.xero_backup
+        if (configured / "csv" / "accounts.csv").exists():
+            self.output_dir = configured.parent
+        else:
+            self.output_dir = workspace.root / "imports" / "xero"
+        legacy_state = workspace.root / "xero_sync_state.db"
+        self.state_db = (
+            legacy_state
+            if not (self.output_dir / "state.db").exists() and legacy_state.exists()
+            else self.output_dir / "state.db"
+        )
         self.job = BackupJob()
         self._pending: dict[str, dict] = {}
 
