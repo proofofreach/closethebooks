@@ -16,7 +16,7 @@ from pathlib import Path
 
 CONFIG_NAME = "books.toml"
 ENVIRONMENT_VARIABLE = "BOOKS_WORKSPACE"
-PRODUCT_NAME = "Plainbooks"
+PRODUCT_NAME = "BooksBot"
 CURRENCY_PATTERN = re.compile(r"^[A-Z][A-Z0-9'._-]{0,22}[A-Z0-9]$")
 ACCOUNT_PATTERN = re.compile(r"^(Assets|Liabilities|Equity|Income|Expenses)(:[A-Z0-9][A-Za-z0-9-]*)+$")
 

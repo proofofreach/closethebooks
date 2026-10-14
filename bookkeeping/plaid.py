@@ -321,7 +321,7 @@ class PlaidClient:
         self,
         redirect_uri: str | None = None,
         *,
-        client_name: str = "Plainbooks",
+        client_name: str = "BooksBot",
         client_user_id: str = "books-owner",
         country_code: str = "US",
     ) -> str:

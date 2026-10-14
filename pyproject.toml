@@ -1,7 +1,7 @@
 [project]
-name = "plainbooks"
+name = "booksbot"
 version = "0.3.0"
-description = "Local-first, AI-assisted bookkeeping for small businesses on a plain-text Beancount ledger"
+description = "AI bookkeeping for small businesses: an AI agent does the books, deterministic tools prove them against your statements"
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE"]

@@ -1,11 +1,15 @@
-# Plainbooks
+# BooksBot
 
-Local-first bookkeeping for small businesses, built on a plain-text
-[Beancount](https://beancount.github.io/) ledger. You keep the books in a
-folder you own, tracked in git. Deterministic tools handle parsing,
-deduplication, and validation. A coding agent you already use does the
-judgment work, and a local web app tells you within seconds whether the books
-are current and what to do next.
+Your books, done by AI: quickly, with almost no effort, and proven against
+your bank statements.
+
+Drop in your statements and tell your coding agent "do the books". It
+categorizes, posts, and validates every transaction, and you approve one diff.
+Deterministic tools handle parsing, deduplication, and checks, so every
+balance is verified against its statement, not guessed. The books live in a
+plain-text [Beancount](https://beancount.github.io/) ledger in a folder you
+own, tracked in git. A local web app tells you within seconds whether the
+books are current and what to do next.
 
 - **No subscription, no server.** Everything runs on your machine. Bank feeds
   (Plaid) are optional. Statement files are the dependable path.
@@ -21,7 +25,7 @@ Requires Python 3.11+. Poppler (`pdftotext`) is optional and improves PDF
 statement parsing.
 
 ```bash
-pipx install .                          # from a checkout (PyPI: `plainbooks`, not yet published)
+pipx install .                          # from a checkout (PyPI: `booksbot`, not yet published)
 books demo ~/books-demo                  # a fictional company to explore
 books --workspace ~/books-demo serve     # opens http://127.0.0.1:5170
 ```

@@ -1,4 +1,4 @@
-# Plainbooks: Product Definition
+# BooksBot: Product Definition
 
 ## Register
 
@@ -8,8 +8,8 @@ product
 
 | Field | Definition |
 | --- | --- |
-| Product | Plainbooks (distribution `plainbooks`, command `books`) |
-| Category | Local-first, AI-assisted bookkeeping workspace and app |
+| Product | BooksBot (distribution `booksbot`, command `books`) |
+| Category | AI bookkeeping: an AI agent does the books; deterministic tools prove them |
 | Primary user | The technical owner-operator of a small business (solo LLC, freelancer, small studio) who already uses a coding agent |
 | Operating model | One workspace per company (`books.toml`), plain-text Beancount ledger, deterministic Python tools, git audit trail, a local web app, and Fava for detailed reports |
 | Primary job | Know whether the books are current and what action to take next |
@@ -18,6 +18,10 @@ product
 | Product boundary | The app reports, explains, and prepares. It writes only the inbox, proposals, statement evidence, invoice documents, account registrations (including their `open` directive), and settings. Posting transactions goes through the reviewed bookkeeping workflow. |
 
 ## Product promise
+
+Your books, done: quickly, with almost no effort, by AI. Drop in statements,
+say "do the books", approve the diff. Every number the AI posts is checked
+against the statement it came from, so speed never costs accuracy.
 
 Open the dashboard and understand book health within five seconds. If work is
 required, show the next concrete action. If the books are current, say so
@@ -80,10 +84,12 @@ recovery path clear.
 
 ## Brand personality
 
-Calm, exact, candid, and quietly technical. Copy uses plain accounting terms,
-specific dates, and direct verbs. The product behaves like a careful operator:
-it distinguishes verified facts from estimates, flags gaps without alarmism,
-and avoids congratulatory or promotional language.
+Fast, effortless, and trustworthy. Marketing leads with the outcome: books
+done in minutes by AI. Inside the product the voice stays calm and exact,
+because confidence about money comes from evidence, not excitement. Copy uses
+plain accounting terms, specific dates, and direct verbs; it distinguishes
+verified facts from estimates and flags gaps without alarmism. Speed is shown
+(fewer steps, one clear next action), not claimed with hype.
 
 ## Anti-references
 
