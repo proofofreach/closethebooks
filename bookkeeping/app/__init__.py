@@ -669,6 +669,8 @@ def create_app(workspace: Workspace, *, mount_reports: bool = True) -> Flask:
             "job": migration.job,
             "progress": migration.progress(),
             "manifest": migration.backup_manifest(),
+            "last_backup": migration.last_complete_backup(),
+            "pending_delta": migration.pending_delta(),
             "backup_root": migration.backup_root(),
             "merged_gl": migration.merged_gl(),
             "blocker": migration.conversion_blocker(),
@@ -731,7 +733,11 @@ def create_app(workspace: Workspace, *, mount_reports: bool = True) -> Flask:
 
     @app.post("/migrate/backup")
     def migrate_backup():
-        return migrate_step(lambda: migration.start_backup() or "Backup started. You can leave this page open.")
+        changes = request.form.get("mode") == "changes"
+        return migrate_step(
+            lambda: migration.start_backup(changes_only=changes)
+            or ("Fetching changes from Xero." if changes else "Backup started. You can leave this page open.")
+        )
 
     @app.post("/migrate/gl")
     def migrate_gl():

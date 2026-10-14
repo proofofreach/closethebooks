@@ -17,9 +17,20 @@ from .utils import ensure_dir, flatten_record, slugify
 
 
 class BackupRunner:
-    def __init__(self, settings: Settings, *, modified_since: str | None = None) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        *,
+        modified_since: str | None = None,
+        delta_id: str | None = None,
+    ) -> None:
+        """`delta_id` fetches only records changed since `modified_since` and
+        merges them into the existing backup in place (latest version wins)."""
+        if delta_id and not modified_since:
+            raise ValueError("A delta run needs modified_since.")
         self.settings = settings
         self.modified_since = modified_since
+        self.delta_id = delta_id
         self.state = StateStore(settings.state_db)
         self.client = XeroClient(settings, TokenStore(settings.token_file))
         self.connection = self._select_connection()
@@ -66,14 +77,19 @@ class BackupRunner:
         if sleep_after:
             print(f"Rate limit reached. Sleeping for {sleep_after} seconds.")
             time.sleep(sleep_after)
-            BackupRunner(self.settings).run(sleep_on_rate_limit=False)
+            BackupRunner(
+                self.settings, modified_since=self.modified_since, delta_id=self.delta_id
+            ).run(sleep_on_rate_limit=False)
             return
         if manifest and manifest["status"] == "complete":
             print(f"Backup complete. Output written to {self.output_root}")
 
+    def _status_key(self, key: str) -> str:
+        return f"{key}@{self.delta_id}" if self.delta_id else key
+
     def phase_one_fetch_data(self) -> None:
         for endpoint in ENDPOINTS:
-            status = self.state.get_sync_status(endpoint.key)
+            status = self.state.get_sync_status(self._status_key(endpoint.key))
             if status and status["completed"]:
                 continue
             self._sync_endpoint(endpoint)
@@ -83,7 +99,8 @@ class BackupRunner:
         self.write_attachment_exports()
 
     def _sync_endpoint(self, endpoint: EndpointSpec) -> None:
-        status = self.state.get_sync_status(endpoint.key)
+        status_key = self._status_key(endpoint.key)
+        status = self.state.get_sync_status(status_key)
         page = int(status["last_page"]) if status else 1
         last_cursor = status["last_cursor"] if status else None
         while True:
@@ -97,10 +114,10 @@ class BackupRunner:
                 )
             except XeroApiError as exc:
                 if endpoint.optional and exc.status_code in {401, 403, 404}:
-                    self.state.upsert_sync_status(endpoint.key, completed=True, last_error=str(exc))
+                    self.state.upsert_sync_status(status_key, completed=True, last_error=str(exc))
                     print(f"Skipping optional endpoint {endpoint.key}: {exc}")
                     return
-                self.state.upsert_sync_status(endpoint.key, last_page=page, last_cursor=last_cursor, last_error=str(exc))
+                self.state.upsert_sync_status(status_key, last_page=page, last_cursor=last_cursor, last_error=str(exc))
                 raise
             records = payload.get(endpoint.response_key, [])
             cursor_label = self._cursor_label(endpoint, page, last_cursor)
@@ -112,35 +129,47 @@ class BackupRunner:
             self._raise_if_header_limits_exhausted(headers)
 
             if endpoint.pagination_mode == "none":
-                self.state.upsert_sync_status(endpoint.key, last_page=1, completed=True)
+                self.state.upsert_sync_status(status_key, last_page=1, completed=True)
                 return
             if not records:
-                self.state.upsert_sync_status(endpoint.key, last_page=page, last_cursor=last_cursor, completed=True)
+                self.state.upsert_sync_status(status_key, last_page=page, last_cursor=last_cursor, completed=True)
                 return
             if endpoint.pagination_mode == "page":
                 if len(records) < endpoint.page_size:
-                    self.state.upsert_sync_status(endpoint.key, last_page=page, completed=True)
+                    self.state.upsert_sync_status(status_key, last_page=page, completed=True)
                     return
                 page += 1
-                self.state.upsert_sync_status(endpoint.key, last_page=page)
+                self.state.upsert_sync_status(status_key, last_page=page)
                 continue
 
             next_cursor = records[-1].get("JournalNumber")
             if next_cursor in {None, last_cursor}:
-                self.state.upsert_sync_status(endpoint.key, last_page=page, last_cursor=str(next_cursor), completed=True)
+                self.state.upsert_sync_status(status_key, last_page=page, last_cursor=str(next_cursor), completed=True)
                 return
             last_cursor = str(next_cursor)
             page += 1
-            self.state.upsert_sync_status(endpoint.key, last_page=page, last_cursor=last_cursor)
+            self.state.upsert_sync_status(status_key, last_page=page, last_cursor=last_cursor)
 
     def _load_existing_records(self, endpoint_key: str, refresh: bool = False) -> list[dict[str, Any]]:
         if endpoint_key in self.records_cache and not refresh:
             return self.records_cache[endpoint_key]
         raw_dir = self.output_root / "raw" / endpoint_key
-        records: list[dict[str, Any]] = []
+        spec = next((e for e in ENDPOINTS if e.key == endpoint_key), None)
+        id_field = spec.entity_id_field if spec else None
+        merged: dict[str, dict[str, Any]] = {}
+        anonymous: list[dict[str, Any]] = []
         if raw_dir.exists():
-            for path in sorted(raw_dir.glob("*.json")):
-                records.extend(json.loads(path.read_text(encoding="utf-8")))
+            # Full-backup pages first, then delta pages oldest to newest, so
+            # the latest version of each record wins.
+            paths = sorted(raw_dir.glob("*.json"), key=lambda p: (p.name.startswith("delta-"), p.name))
+            for path in paths:
+                for record in json.loads(path.read_text(encoding="utf-8")):
+                    record_id = record.get(id_field) if id_field else None
+                    if record_id:
+                        merged[record_id] = record
+                    else:
+                        anonymous.append(record)
+        records = [*merged.values(), *anonymous]
         self.records_cache[endpoint_key] = records
         return records
 
@@ -152,12 +181,13 @@ class BackupRunner:
         return None
 
     def _cursor_label(self, endpoint: EndpointSpec, page: int, last_cursor: str | None) -> str:
+        prefix = f"delta-{self.delta_id}-" if self.delta_id else ""
         if endpoint.pagination_mode == "page":
-            return f"page-{page:05d}"
+            return f"{prefix}page-{page:05d}"
         if endpoint.pagination_mode == "offset":
             suffix = last_cursor or "start"
-            return f"offset-{suffix}"
-        return "full"
+            return f"{prefix}offset-{suffix}"
+        return f"{prefix}full"
 
     def _track_entities(self, endpoint: EndpointSpec, records: list[dict[str, Any]]) -> None:
         if not endpoint.entity_id_field:
@@ -168,10 +198,13 @@ class BackupRunner:
                 continue
             has_attachments = bool(record.get("HasAttachments", False))
             self.state.upsert_entity(entity_id, endpoint.key, has_attachments)
+            if self.delta_id and has_attachments:
+                # A changed record may carry new attachments: look again.
+                self.state.mark_entity_undiscovered(entity_id, endpoint.key)
         self.state.commit()
 
     def phase_two_discover_attachments(self) -> None:
-        phase_key = "attachment_discovery"
+        phase_key = self._status_key("attachment_discovery")
         status = self.state.get_sync_status(phase_key)
         if status and status["completed"]:
             return
@@ -206,7 +239,7 @@ class BackupRunner:
         self.state.upsert_sync_status(phase_key, completed=True)
 
     def phase_three_download_attachments(self) -> None:
-        phase_key = "attachment_downloads"
+        phase_key = self._status_key("attachment_downloads")
         status = self.state.get_sync_status(phase_key)
         if status and status["completed"]:
             return

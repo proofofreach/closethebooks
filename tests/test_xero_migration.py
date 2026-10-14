@@ -112,3 +112,65 @@ def test_authorization_uses_granular_scopes_and_allows_override(migration):
     xero._write_private(xero.client_file, {**xero.client(), "scopes": ["openid", "accounting.settings.read"]})
     url = xero.authorization_url("http://localhost:5170/migrate/callback")
     assert "scope=openid+accounting.settings.read&" in url
+
+
+def test_delta_pages_merge_in_place_with_latest_version_winning(tmp_path):
+    import json
+
+    from xero_absolute_backup.backup import BackupRunner
+    from xero_absolute_backup.models import ENDPOINTS
+
+    runner = object.__new__(BackupRunner)
+    runner.output_root = tmp_path
+    runner.records_cache = {}
+    runner.delta_id = "20261014T120000"
+    raw = tmp_path / "raw" / "contacts"
+    raw.mkdir(parents=True)
+    (raw / "page-00001.json").write_text(json.dumps([{"ContactID": "c1", "Name": "Old"}, {"ContactID": "c2", "Name": "Same"}]))
+    (raw / "delta-20261014T120000-page-00001.json").write_text(json.dumps([{"ContactID": "c1", "Name": "New"}, {"ContactID": "c3", "Name": "Added"}]))
+    records = runner._load_existing_records("contacts", refresh=True)
+    assert [(r["ContactID"], r["Name"]) for r in records] == [("c1", "New"), ("c2", "Same"), ("c3", "Added")]
+    contacts = next(e for e in ENDPOINTS if e.key == "contacts")
+    assert runner._cursor_label(contacts, 1, None).startswith("delta-20261014T120000-")
+    assert runner._status_key("contacts") == "contacts@20261014T120000"
+
+
+def test_fetch_changes_needs_a_full_backup_then_resumes_a_paused_run(migration, monkeypatch):
+    import json
+    import time as _time
+
+    import xero_absolute_backup.backup as backup_module
+
+    xero, backup = migration
+    xero.save_client("ABC123")
+    with pytest.raises(ValueError, match="full backup"):
+        xero.start_backup(changes_only=True)
+
+    calls = []
+
+    class FakeRunner:
+        def __init__(self, settings, *, modified_since=None, delta_id=None):
+            calls.append((modified_since, delta_id))
+            self.connection = {"tenantName": "Migrated Co"}
+
+        def run(self, sleep_on_rate_limit=False):
+            status = "paused" if len(calls) == 2 else "complete"
+            (backup / "manifests").mkdir(parents=True, exist_ok=True)
+            (backup / "manifests" / "run_summary.json").write_text(
+                json.dumps({"status": status, "generated_at": "2026-10-01T10:00:00+00:00"})
+            )
+
+    monkeypatch.setattr(backup_module, "BackupRunner", FakeRunner)
+
+    def wait():
+        while xero.job.state == "running":
+            _time.sleep(0.01)
+
+    xero.start_backup(); wait()                      # full backup completes
+    assert calls[-1] == (None, None) and xero.job.state == "complete"
+    xero.start_backup(changes_only=True); wait()     # delta pauses at the API limit
+    since, delta_id = calls[-1]
+    assert since == "2026-09-30T10:00:00" and delta_id and xero.job.state == "paused"
+    xero.start_backup(); wait()                      # a plain resume continues the same delta
+    assert calls[-1] == (since, delta_id) and xero.job.state == "complete"
+    assert xero.pending_delta() is None

@@ -112,6 +112,12 @@ class StateStore:
             (entity_id, entity_type, int(has_attachments)),
         )
 
+    def mark_entity_undiscovered(self, entity_id: str, entity_type: str) -> None:
+        self.connection.execute(
+            "UPDATE entities SET attachment_discovered = 0 WHERE entity_id = ? AND type = ?",
+            (entity_id, entity_type),
+        )
+
     def mark_entity_discovered(self, entity_id: str, entity_type: str) -> None:
         self.connection.execute(
             """

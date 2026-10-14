@@ -185,22 +185,63 @@ class XeroMigration:
 
     # Backup ----------------------------------------------------------------
 
-    def start_backup(self) -> None:
+    def last_complete_backup(self) -> dt.datetime | None:
+        """When the most recent full or delta backup finished, if any did."""
+        manifest = self.backup_manifest() or {}
+        if manifest.get("status") != "complete" or not manifest.get("generated_at"):
+            return None
+        return dt.datetime.fromisoformat(manifest["generated_at"])
+
+    def pending_delta(self) -> dict | None:
+        pending = self.client().get("pending_delta")
+        return pending if isinstance(pending, dict) else None
+
+    def start_backup(self, changes_only: bool = False) -> None:
+        """Run or resume the full backup, or fetch changes since the last one.
+
+        A changes-only run asks Xero for records modified since the last
+        completed backup (less a day of overlap) and merges them in place;
+        the latest version of each record wins.
+        """
         if self.job.state == "running":
             return
         settings = self.settings()
+        modified_since = delta_id = None
+        pending = self.pending_delta()
+        if changes_only or pending:
+            if pending:
+                delta_id, modified_since = pending["id"], pending["since"]
+            else:
+                since = self.last_complete_backup()
+                if since is None:
+                    raise ValueError("Finish a full backup before fetching changes.")
+                modified_since = (since - dt.timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S")
+                delta_id = dt.datetime.now().strftime("%Y%m%dT%H%M%S")
+                # Remember the run so a paused fetch resumes instead of restarting.
+                self._write_private(
+                    self.client_file,
+                    {**self.client(), "pending_delta": {"id": delta_id, "since": modified_since}},
+                )
+            changes_only = True
+        label = f"changes since {modified_since[:10]}" if changes_only else "the organisation"
         self.job = BackupJob(state="running", message="Connecting to Xero…", started=dt.datetime.now())
 
         def run() -> None:
             from xero_absolute_backup.backup import BackupRunner
 
             try:
-                runner = BackupRunner(settings)
-                self.job.message = f"Backing up {runner.connection.get('tenantName', 'the organisation')}…"
+                runner = BackupRunner(settings, modified_since=modified_since, delta_id=delta_id)
+                name = runner.connection.get("tenantName", "Xero")
+                self.job.message = f"Backing up {label} for {name}…"
                 runner.run(sleep_on_rate_limit=False)
                 manifest = self.backup_manifest() or {}
                 if manifest.get("status") == "complete":
-                    self.job.state, self.job.message = "complete", "Backup complete."
+                    self.job.state = "complete"
+                    self.job.message = "Changes fetched and merged." if changes_only else "Backup complete."
+                    if changes_only:
+                        client = self.client()
+                        client.pop("pending_delta", None)
+                        self._write_private(self.client_file, client)
                 else:
                     self.job.state = "paused"
                     self.job.message = (

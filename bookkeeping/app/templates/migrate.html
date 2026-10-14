@@ -59,15 +59,25 @@
 
   <li class="step {{ 'done' if done.backup }}{{ ' locked' if not done.connect }}">
     <div class="step-head"><h2>3. Back up the organisation</h2>
-      {% if done.backup %}{{ status('current', 'Done') }}{% elif m.job.state == 'running' %}{{ status('due', 'Running') }}{% elif m.manifest %}{{ status('due', 'Paused') }}{% else %}{{ status('muted', 'To do') }}{% endif %}</div>
+      {% if m.job.state == 'running' %}{{ status('due', 'Running') }}{% elif done.backup %}{{ status('current', 'Done') }}{% elif False %}{{ status('due', 'Running') }}{% elif m.manifest %}{{ status('due', 'Paused') }}{% else %}{{ status('muted', 'To do') }}{% endif %}</div>
     <p class="lede">Downloads contacts, invoices, bank transactions, the chart of accounts, and every attachment. Large organisations can hit Xero's daily API limit; the backup then pauses and resumes where it stopped.</p>
     <div data-backup-status data-state="{{ m.job.state }}" role="status" aria-live="polite">
-      <p class="backup-message">{{ m.job.message or (m.manifest and ('Last run: ' ~ m.manifest.status)) or '' }}</p>
+      <p class="backup-message">{% if m.job.message %}{{ m.job.message }}{% elif m.pending_delta %}Fetching changes since {{ m.pending_delta.since[:10] }} was paused.{% elif m.last_backup %}Backup complete, {{ m.last_backup.date() | day }}.{% elif m.manifest %}Paused: {{ m.manifest.rate_limit_reason or 'resume to continue' }}{% endif %}</p>
       {% if m.progress %}<p class="hint backup-progress">{{ '{:,}'.format(m.progress.entities) }} records · {{ '{:,}'.format(m.progress.attachments_downloaded) }} of {{ '{:,}'.format(m.progress.attachments_queued) }} attachments</p>{% endif %}
     </div>
     <form method="post" action="{{ url_for('migrate_backup') }}">
       <input type="hidden" name="csrf" value="{{ csrf_token }}">
-      <button class="button primary" type="submit" {{ 'disabled' if not done.connect or m.job.state == 'running' }}>{{ 'Resume backup' if m.manifest and not done.backup else ('Run again' if done.backup else 'Start backup') }}</button>
+      {% set busy = m.job.state == 'running' %}
+      {% if m.pending_delta %}
+        <input type="hidden" name="mode" value="changes">
+        <button class="button primary" type="submit" {{ 'disabled' if busy }}>Resume fetching changes</button>
+      {% elif m.last_backup %}
+        <input type="hidden" name="mode" value="changes">
+        <button class="button" type="submit" {{ 'disabled' if busy or not done.connect }}>Fetch changes since {{ m.last_backup.date() | day }}</button>
+        <span class="hint">Adds records and attachments changed in Xero since then. Run it once more just before you cancel Xero.</span>
+      {% else %}
+        <button class="button primary" type="submit" {{ 'disabled' if not done.connect or busy }}>{{ 'Resume backup' if m.manifest else 'Start backup' }}</button>
+      {% endif %}
     </form>
   </li>
 
