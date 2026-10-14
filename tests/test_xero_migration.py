@@ -101,3 +101,14 @@ def test_conversion_refuses_a_ledger_with_its_own_transactions(migration):
     assert "did not come from Xero" in xero.conversion_blocker()
     with pytest.raises(ValueError):
         xero.convert()
+
+
+def test_authorization_uses_granular_scopes_and_allows_override(migration):
+    xero, _backup = migration
+    xero.save_client("ABC123")
+    url = xero.authorization_url("http://localhost:5170/migrate/callback")
+    assert "accounting.transactions.read" not in url
+    assert "accounting.banktransactions.read" in url
+    xero._write_private(xero.client_file, {**xero.client(), "scopes": ["openid", "accounting.settings.read"]})
+    url = xero.authorization_url("http://localhost:5170/migrate/callback")
+    assert "scope=openid+accounting.settings.read&" in url

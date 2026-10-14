@@ -26,6 +26,8 @@ from beancount.core.data import Open, Transaction
 
 from .workspace import Workspace
 
+# Granular read scopes (Xero retired the broad accounting.transactions scope
+# in 2026). Override per workspace with "scopes" in secrets/xero/client.json.
 AUTHORIZE_URL = "https://login.xero.com/identity/connect/authorize"
 TOKEN_URL = "https://identity.xero.com/connect/token"
 SCOPES = (
@@ -33,12 +35,13 @@ SCOPES = (
     "profile",
     "email",
     "offline_access",
-    "accounting.transactions.read",
     "accounting.invoices.read",
     "accounting.banktransactions.read",
     "accounting.contacts.read",
     "accounting.settings.read",
     "accounting.attachments.read",
+    "accounting.reports.profitandloss.read",
+    "accounting.reports.balancesheet.read",
 )
 
 
@@ -107,7 +110,7 @@ class XeroMigration:
             client_id=client["client_id"],
             client_secret=client.get("client_secret"),
             redirect_uri=redirect_uri,
-            scopes=SCOPES,
+            scopes=tuple(client.get("scopes") or SCOPES),
             tenant_id=client.get("tenant_id"),
             token_file=self.token_file,
             state_db=self.state_db,
@@ -124,7 +127,7 @@ class XeroMigration:
             "response_type": "code",
             "client_id": client["client_id"],
             "redirect_uri": redirect_uri,
-            "scope": " ".join(SCOPES),
+            "scope": " ".join(client.get("scopes") or SCOPES),
             "state": state,
         }
         pending = {"redirect_uri": redirect_uri, "created": time.time()}

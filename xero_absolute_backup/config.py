@@ -10,12 +10,13 @@ DEFAULT_SCOPES = (
     "profile",
     "email",
     "offline_access",
-    "accounting.transactions.read",
     "accounting.invoices.read",
     "accounting.banktransactions.read",
     "accounting.contacts.read",
     "accounting.settings.read",
     "accounting.attachments.read",
+    "accounting.reports.profitandloss.read",
+    "accounting.reports.balancesheet.read",
 )
 
 
