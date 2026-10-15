@@ -173,7 +173,9 @@ class StatementEvidenceTests(unittest.TestCase):
             )
             validation = subprocess.run(
                 [
-                    str(Path(sys.executable).with_name("bean-check")),
+                    sys.executable,
+                    "-m",
+                    "beancount.scripts.check",
                     str(ledger / "main.beancount"),
                 ],
                 capture_output=True,

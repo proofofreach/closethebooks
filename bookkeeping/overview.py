@@ -15,6 +15,7 @@ from urllib.parse import urlencode
 from beancount.core.data import Transaction
 
 from .accounts import AccountSource
+from .dates import long_date
 from .status import compute_status
 from .workspace import Workspace
 
@@ -264,14 +265,14 @@ def build_overview(
         if source.ingestion != "statement":
             title = f"Refresh the {row.name} feed"
             detail = (
-                f"No transactions since {row.last_transaction:%b %-d, %Y}. Run `books fetch`, then upload a statement "
+                f"No transactions since {long_date(row.last_transaction)}. Run `books fetch`, then upload a statement "
                 "to verify the balance."
                 if row.last_transaction
                 else "The feed has not delivered transactions yet. Run `books fetch`."
             )
         else:
             title = f"Upload the {row.name} statement"
-            detail = f"Cover {start:%b %-d, %Y} through {today:%b %-d, %Y}."
+            detail = f"Cover {long_date(start)} through {long_date(today)}."
             if obligation["kind"] == "balance_verification":
                 detail += " The latest balance is not yet verified against a statement."
         actions.append(

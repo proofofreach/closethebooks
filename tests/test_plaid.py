@@ -1,3 +1,4 @@
+import os
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -184,7 +185,8 @@ class PlaidClientTests(unittest.TestCase):
 
             self.assertEqual(store.items()[0]["cursor"], "cursor-1")
             self.assertEqual(store.items()[0]["access_token"], "replacement-secret")
-            self.assertEqual(store.path.stat().st_mode & 0o777, 0o600)
+            if os.name == "posix":  # Windows has no Unix permission bits
+                self.assertEqual(store.path.stat().st_mode & 0o777, 0o600)
 
     def test_connection_exchange_saves_item_and_account_metadata(self):
         responses = {

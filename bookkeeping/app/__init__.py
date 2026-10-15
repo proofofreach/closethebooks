@@ -38,6 +38,7 @@ from werkzeug.utils import secure_filename
 
 from .. import assistant
 from ..accounts import AccountSource, load_account_sources
+from ..dates import long_date, short_date
 from ..workspace import PRODUCT_NAME, Workspace, WorkspaceError, load_workspace
 
 MAX_STATEMENT_BYTES = 20 * 1024 * 1024
@@ -243,7 +244,7 @@ def invoice_rows(workspace: Workspace, entries: list) -> list[dict]:
         elif balance > 0:
             due = dt.date.fromisoformat(record["due"]) if record.get("due") else None
             if due and due < dt.date.today():
-                state, label = "overdue", f"Overdue since {due:%b %-d}"
+                state, label = "overdue", f"Overdue since {short_date(due)}"
             else:
                 state, label = "open", "Open"
         else:
@@ -286,8 +287,8 @@ def _date(value, style: str = "medium") -> str:
     if isinstance(value, str):
         value = dt.date.fromisoformat(value)
     if style == "short":
-        return f"{value:%b %-d}"
-    return f"{value:%b %-d, %Y}"
+        return short_date(value)
+    return long_date(value)
 
 
 def create_app(workspace: Workspace, *, mount_reports: bool = True) -> Flask:

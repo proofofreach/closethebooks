@@ -1,4 +1,5 @@
 import csv
+import os
 import datetime as dt
 from pathlib import Path
 
@@ -54,7 +55,8 @@ def test_client_id_is_validated_and_stored_privately(migration):
         xero.save_client("not a client id!")
     xero.save_client("ABC123")
     assert xero.client() == {"client_id": "ABC123"}
-    assert oct(xero.client_file.stat().st_mode & 0o777) == "0o600"
+    if os.name == "posix":  # Windows has no Unix permission bits
+        assert oct(xero.client_file.stat().st_mode & 0o777) == "0o600"
     url = xero.authorization_url("http://localhost:5170/migrate/callback")
     assert "code_challenge=" in url and "client_id=ABC123" in url
 

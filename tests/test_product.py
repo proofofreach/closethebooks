@@ -371,3 +371,15 @@ def test_statement_request_starts_after_the_last_verified_balance(workspace):
     status = account_status(workspace, today=TODAY)
     overdue = next(o for o in status["obligations"] if o["kind"] == "overdue")
     assert overdue["coverage_start"] == "2026-04-01"
+
+
+def test_no_platform_specific_date_directives():
+    """%-d works only on Unix and %#d only on Windows; use bookkeeping.dates."""
+    offenders = [
+        f"{path.relative_to(ROOT)}:{number}"
+        for path in (ROOT / "bookkeeping").rglob("*")
+        if path.suffix in {".py", ".html"} and path.name != "dates.py"
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1)
+        if re.search(r"%[-#][a-zA-Z]", line)
+    ]
+    assert offenders == []
