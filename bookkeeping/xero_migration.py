@@ -247,12 +247,14 @@ class XeroMigration:
                 runner.run(sleep_on_rate_limit=False)
                 manifest = self.backup_manifest() or {}
                 if manifest.get("status") == "complete":
-                    self.job.state = "complete"
-                    self.job.message = "Changes fetched and merged." if changes_only else "Backup complete."
+                    # Clear the resume marker before announcing completion,
+                    # so nothing observing the state sees a stale pending run.
                     if changes_only:
                         client = self.client()
                         client.pop("pending_delta", None)
                         self._write_private(self.client_file, client)
+                    self.job.message = "Changes fetched and merged." if changes_only else "Backup complete."
+                    self.job.state = "complete"
                 else:
                     self.job.state = "paused"
                     self.job.message = (

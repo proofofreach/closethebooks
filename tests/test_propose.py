@@ -300,3 +300,12 @@ class ProposeTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_statement_spec_keeps_windows_paths_and_trailing_presets():
+    from bookkeeping.propose import parse_statement_spec
+
+    assert parse_statement_spec(r"checking=C:\Users\me\june.csv") == ("checking", Path(r"C:\Users\me\june.csv"), None)
+    assert parse_statement_spec(r"paypal=C:\Users\me\pp.csv:paypal") == ("paypal", Path(r"C:\Users\me\pp.csv"), "paypal")
+    assert parse_statement_spec("savings=inbox/stmt.pdf:quickbooks-checking") == ("savings", Path("inbox/stmt.pdf"), "quickbooks-checking")
+    assert parse_statement_spec("card=inbox/july.csv") == ("card", Path("inbox/july.csv"), None)

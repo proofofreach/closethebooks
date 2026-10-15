@@ -7,6 +7,7 @@ data yields nothing new.
 
 from __future__ import annotations
 
+import re
 from collections import Counter
 from decimal import Decimal
 from pathlib import Path
@@ -224,8 +225,11 @@ def parse_statement_spec(spec: str) -> tuple[str, Path, str | None]:
     key, separator, rest = spec.partition("=")
     if not separator or not key or not rest:
         raise ValueError(f"Statement must look like KEY=PATH[:preset], got {spec!r}.")
-    path_text, _, preset = rest.partition(":")
-    return key, Path(path_text), preset or None
+    # Only a trailing ":name" is a preset, so Windows paths (C:\...) survive.
+    path_text, colon, preset = rest.rpartition(":")
+    if colon and path_text and len(path_text) > 1 and re.fullmatch(r"[A-Za-z0-9_-]+", preset):
+        return key, Path(path_text), preset
+    return key, Path(rest), None
 
 
 def run_propose(
