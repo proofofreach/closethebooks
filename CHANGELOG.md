@@ -4,26 +4,12 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.3.0] — 2026-10-15 — Early access
 
-### Changed
-
-- Product renamed to CloseTheBooks (distribution `closethebooks`). The
-  `books` command is unchanged.
-- Plaid bank feeds are marked experimental until verified live.
-
-### Fixed
-
-- Dates no longer use the Unix-only `%-d` directive, which crashed on Windows.
-
-### Added
-
-- Continuous integration on Linux, macOS, and Windows for Python 3.11–3.14,
-  plus a clean-environment wheel build and smoke test.
-
-## [0.3.0] — Early access
-
-First release as a standalone, company-neutral product.
+First release as a standalone, company-neutral product, named
+CloseTheBooks (distribution `closethebooks`, command `books`). Tested on
+Python 3.11–3.14 on Linux, macOS, and Windows. Plaid bank feeds are
+experimental.
 
 ### Added
 
@@ -51,5 +37,7 @@ First release as a standalone, company-neutral product.
 ### Fixed
 
 - Invoice numbers already recorded in the ledger are never reused.
+- Windows: dates no longer use the Unix-only `%-d` directive, and
+  `--statement KEY=C:\path` keeps the drive letter.
 - Attachments found after the records phase now reach the attachments
   manifest that conversion reads.
