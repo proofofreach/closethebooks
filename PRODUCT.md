@@ -1,4 +1,4 @@
-# BooksBot: Product Definition
+# CloseTheBooks: Product Definition
 
 ## Register
 
@@ -8,7 +8,7 @@ product
 
 | Field | Definition |
 | --- | --- |
-| Product | BooksBot (distribution `booksbot`, command `books`) |
+| Product | CloseTheBooks (distribution `closethebooks`, command `books`) |
 | Category | AI bookkeeping: an AI agent does the books; deterministic tools prove them |
 | Primary user | The technical owner-operator of a small business (solo LLC, freelancer, small studio) who already uses a coding agent |
 | Operating model | One workspace per company (`books.toml`), plain-text Beancount ledger, deterministic Python tools, git audit trail, a local web app, and Fava for detailed reports |

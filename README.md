@@ -1,4 +1,4 @@
-# BooksBot
+# CloseTheBooks
 
 Your books, done by AI: quickly, with almost no effort, and proven against
 your bank statements.
@@ -11,8 +11,9 @@ plain-text [Beancount](https://beancount.github.io/) ledger in a folder you
 own, tracked in git. A local web app tells you within seconds whether the
 books are current and what to do next.
 
-- **No subscription, no server.** Everything runs on your machine. Bank feeds
-  (Plaid) are optional. Statement files are the dependable path.
+- **No subscription, no server.** Everything runs on your machine. Statement
+  files are the dependable path; bank feeds (Plaid) are optional and
+  **experimental** in this release.
 - **Evidence over reassurance.** A balance counts as verified only when a
   statement backs it. The retained statement is SHA-addressed and linked from
   the ledger.
@@ -25,7 +26,7 @@ Requires Python 3.11+. Poppler (`pdftotext`) is optional and improves PDF
 statement parsing.
 
 ```bash
-pipx install .                          # from a checkout (PyPI: `booksbot`, not yet published)
+pipx install .                          # from a checkout (PyPI: `closethebooks`, not yet published)
 books demo ~/books-demo                  # a fictional company to explore
 books --workspace ~/books-demo serve     # opens http://127.0.0.1:5170
 ```

@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Product renamed to CloseTheBooks (distribution `closethebooks`). The
+  `books` command is unchanged.
+- Plaid bank feeds are marked experimental until verified live.
+
 ### Fixed
 
 - Dates no longer use the Unix-only `%-d` directive, which crashed on Windows.

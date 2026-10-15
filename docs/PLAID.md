@@ -1,5 +1,9 @@
 # Plaid bank-feed setup
 
+> **Experimental.** The Plaid adapter is covered by automated tests but has not
+> yet been verified against a live Plaid production account. Statements remain
+> the supported path.
+
 Plaid supplies continuous transaction observations. Bank statements and
 balance assertions remain the reconciliation evidence; a feed alone does not
 prove completeness.

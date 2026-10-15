@@ -1,5 +1,5 @@
 [project]
-name = "booksbot"
+name = "closethebooks"
 version = "0.3.0"
 description = "AI bookkeeping for small businesses: an AI agent does the books, deterministic tools prove them against your statements"
 readme = "README.md"
