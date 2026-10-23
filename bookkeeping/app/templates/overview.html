@@ -15,7 +15,7 @@
 </section>
 
 <section class="section" aria-labelledby="actions-heading">
-  <div class="section-head"><h2 id="actions-heading">What to do next</h2>
+  <div class="section-head"><h2 id="actions-heading">{{ "Start with your files" if not d.active and not d.inactive and not d.has_transactions else "What to do next" }}</h2>
     {% if d.actions %}<span class="aside">{{ d.actions | length }} item{{ 's' if d.actions | length != 1 }}, most urgent first</span>{% endif %}
   </div>
   {% if d.actions %}

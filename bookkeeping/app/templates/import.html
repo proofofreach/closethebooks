@@ -8,12 +8,19 @@
   </div>
 </div>
 
+<section class="import-paths" aria-label="Import paths">
+  <div><h2>Bank statements</h2><p>Download files from your bank and upload them below. No bank connection or developer approval is required. CSV, OFX, QFX, QBO, MT940, and supported PDFs.</p><a href="#upload-heading">Add a statement</a> · <a href="{{ url_for('account_new') }}">Add an account</a></div>
+  <div><h2>Accounting history</h2><p>Move a ledger from Xero, QuickBooks Online, or Wave. Review account mappings, source coverage, and verification before accepting a migration.</p><a href="/migrations">Move accounting history</a></div>
+</section>
+<details class="import-help"><summary class="disclosure">Formats and optional bank connections</summary><div class="lede"><p>QBO (QuickBooks Web Connect) contains bank activity. Use Accounting history for a company ledger. PayPal CSV needs the PayPal activity parser in account settings, including fees. PDF support is currently QuickBooks Checking.</p><p>For other CSV layouts, upload a file and choose Map CSV in the inbox. Choose date order and amount direction, then review all rows before saving.</p><p>Plaid and Teller are optional advanced feeds configured from the command line. Plaid developer enrollment can require identity and business checks. Start with files to avoid that dependency.</p></div></details>
+
 {% set has_files = files | length > 0 %}
 {% set has_proposals = proposals and (proposals.transactions or proposals.balances) %}
+{% set stale_proposals = proposals and (files | selectattr('added', 'gt', proposals.updated) | list | length > 0) %}
 <ol class="steps" aria-label="Import steps">
-  <li class="{{ 'done' if has_files or has_proposals else 'now' }}"><b>1. Add statements</b><span>Upload CSV, OFX, QFX, QBO, or a supported PDF.</span></li>
-  <li class="{{ 'done' if has_proposals else ('now' if has_files else '') }}"><b>2. Prepare proposals</b><span>Deduplicate, suggest categories, and keep statement evidence.</span></li>
-  <li class="{{ 'now' if has_proposals else '' }}"><b>3. Review and post</b><span>Ask your coding agent to do the books, then approve the diff.</span></li>
+  <li class="{{ 'done' if has_files or has_proposals else 'now' }}"><b>1. Add statements</b><span>Upload CSV, OFX, QFX, QBO, MT940, or a supported PDF.</span></li>
+  <li class="{{ 'done' if has_proposals and not stale_proposals else ('now' if has_files else '') }}"><b>2. Prepare proposals</b><span>Deduplicate, suggest categories, and keep statement evidence.</span></li>
+  <li class="{{ 'now' if has_proposals and not stale_proposals else '' }}"><b>3. Review and post</b><span>Ask your coding agent to do the books, then approve the diff.</span></li>
 </ol>
 
 <section aria-labelledby="upload-heading">
@@ -45,7 +52,7 @@
   {% if files %}
   <div class="table-wrap">
     <table class="responsive">
-      <thead><tr><th scope="col">File</th><th scope="col">Account</th><th scope="col" class="num">Size</th><th scope="col">Added</th></tr></thead>
+      <thead><tr><th scope="col">File</th><th scope="col">Account</th><th scope="col" class="num">Size</th><th scope="col">Added</th><th scope="col">CSV mapping</th></tr></thead>
       <tbody>
       {% for file in files %}
         <tr>
@@ -53,6 +60,7 @@
           <td data-label="Account">{% if file.account %}{{ file.account }}{% if not file.active %} <span class="status muted">Inactive</span>{% endif %}{% else %}<span class="status due">No account</span>{% endif %}</td>
           <td data-label="Size" class="num">{{ file.size | filesizeformat }}</td>
           <td data-label="Added">{{ file.added.date() | day }}</td>
+          <td data-label="CSV mapping">{% if file.name.lower().endswith('.csv') and file.key and file.preset != 'paypal' %}{% if file.csv_mapping_error %}<span class="status due">Mapping needs repair</span>{% elif file.csv_mapped %}<span class="status verified">Mapped</span>{% else %}<span class="status due">Needs mapping</span>{% endif %}<a class="button small" href="{{ url_for('csv_import.mapping', filename=file.name) }}">Map CSV</a>{% elif file.preset == 'paypal' %}PayPal parser{% else %}—{% endif %}</td>
         </tr>
       {% endfor %}
       </tbody>
@@ -61,7 +69,7 @@
   <form action="{{ url_for('prepare') }}" method="post" class="form-actions" data-busy-form>
     <input type="hidden" name="csrf" value="{{ csrf_token }}">
     <button class="button primary" type="submit" data-busy-label="Preparing…">Prepare proposals</button>
-    <span class="muted" style="font-size:13px">Reads every inbox file with an active account, plus connected bank feeds. Safe to repeat: transactions already in the ledger are skipped.</span>
+    <span class="muted" style="font-size:13px">Generic CSV files must be mapped first. Reads inbox files with an active account, plus connected bank feeds. Safe to repeat: transactions already in the ledger are skipped.</span>
   </form>
   {% else %}
   <div class="empty"><p>The inbox is empty. Upload a statement above, or drop files into <span class="mono">{{ workspace.relative(workspace.inbox) }}/</span> named <span class="mono">&lt;account-key&gt;--&lt;name&gt;.csv</span>.</p></div>
@@ -71,6 +79,7 @@
 <section class="section" aria-labelledby="proposals-heading">
   <div class="section-head"><h2 id="proposals-heading">Proposals</h2>
     {% if proposals %}<span class="aside">Prepared {{ proposals.updated.date() | day }} · <span class="mono">{{ proposals.path }}</span></span>{% endif %}</div>
+  {% if stale_proposals %}<p class="notice">Inbox files were added after these proposals were prepared. Map any new CSV files and prepare proposals again before reviewing.</p>{% endif %}
   {% if has_proposals %}
     {% set uncategorized = proposals.transactions | selectattr('suggested', 'false') | list | length %}
     <p class="lede">{{ proposals.transactions | length }} transaction{{ 's' if proposals.transactions | length != 1 }} proposed{% if uncategorized %}; {{ uncategorized }} without a category suggestion{% endif %}{% if proposals.balances %}; {{ proposals.balances | length }} statement balance{{ 's' if proposals.balances | length != 1 }} to verify{% endif %}.</p>

@@ -22,3 +22,7 @@ books-demo/
 books.toml
 sources.toml
 proposed.beancount
+
+# Local browser verification artifacts
+.playwright-cli/
+output/playwright/

@@ -35,12 +35,14 @@ survive 320 px widths and long names. Wide tables become labelled rows below
 | `--paper-sunken` inputs, code, prompt chips | `#f2f0ea` | `#0f1113` |
 | `--ink` / `--ink-2` / `--ink-3` / `--ink-4` | primary, supporting, metadata, muted | same hierarchy, inverted |
 | `--rule` / `--rule-2` / `--rule-3` | hairline, separation, section rule | same at lower alpha |
+| `--control-rule` input/button boundary | `#858b90` | `#747a80` |
 | `--stamp` accent: links, primary buttons, focus, chart line | `#2a4a8a` | `#93b1ee` |
 | `--tick` current, verified, paid | `#2b6b40` | `#74c08b` |
 | `--ochre` due, open, needs attention | `#855600` | `#e0ae4c` |
 | `--red-ink` overdue, blocked, errors | `#a3261c` | `#f08a80` |
 
-Dark mode follows `prefers-color-scheme`. Status colours are reserved for
+Dark mode is the default. Settings offers Light and Use system setting, saved
+in this browser. The preference is applied before styles load. Status colours are reserved for
 status. Never use them as decoration or as a series colour.
 
 Spacing is a 4 px base (`--s1` to `--s12`). Radius is 4 px for controls and
@@ -95,3 +97,13 @@ Spacing is a 4 px base (`--s1` to `--s12`). Radius is 4 px for controls and
 No KPI card grids, gradients, illustrations, celebratory states, or motion
 beyond 120 ms state transitions. No web fonts, so the app stays fully offline.
 No company names or branding in the product. The workspace supplies them.
+
+## File-first onboarding and import
+
+Lead with two tasks: add recurring bank statements or move accounting history.
+Keep provider enrollment outside the required path. Generic CSV layouts get an
+original-file sample, explicit field/date/sign mapping, all-row validation, and
+a preview before saving. Bind saved mappings to source bytes. Keep a distinct
+review and acceptance boundary for initial ledger migrations. Show migration
+coverage and unsupported records beside verification; a balanced ledger alone
+does not prove complete company migration.

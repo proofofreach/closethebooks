@@ -3,8 +3,17 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script>
+    (() => {
+      let preference = "dark";
+      try { preference = localStorage.getItem("books-theme") || "dark"; } catch {}
+      const light = preference === "light" || (preference === "system" && matchMedia("(prefers-color-scheme: light)").matches);
+      document.documentElement.dataset.theme = light ? "light" : "dark";
+    })();
+  </script>
   <meta name="books-token" content="{{ csrf_token }}">
   <title>{{ title }} · {{ company.name }}</title>
+  <link rel="icon" href="data:,">
   <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
   <script src="{{ url_for('static', filename='app.js') }}" defer></script>
 </head>
@@ -23,7 +32,8 @@
         {% for endpoint, label in items %}
           {% set active = nav == endpoint
              or (endpoint == 'accounts' and nav in ('account_new', 'account_edit'))
-             or (endpoint == 'invoices' and nav == 'invoice_new') %}
+             or (endpoint == 'invoices' and nav == 'invoice_new')
+             or (endpoint == 'import_page' and (nav == 'migrate' or (nav or '').startswith('csv_import.') or (nav or '').startswith('file_migrations.'))) %}
           <a href="{{ url_for(endpoint) }}"{% if active %} aria-current="page"{% endif %}>{{ label }}</a>
         {% endfor %}
         <a class="nav-reports" href="/reports/">Reports</a>
@@ -44,7 +54,7 @@
   </main>
   <footer class="page-foot">
     Ledger: <span class="mono">{{ workspace.relative(workspace.ledger_main) }}</span> in {{ workspace.root }}.
-    Local only. Nothing on this page leaves this computer, except questions you send from Ask.
+    Local workspace. Ask sends questions and ledger results to your AI provider. Xero migration connects to Xero.
   </footer>
 </body>
 </html>

@@ -45,9 +45,11 @@ values instead.
 
 3. **Append.** Move finalized transactions and generated balance assertions
    into `ledger/years/<year>.beancount` (by each entry's date), in date order.
-   Create the year file and add its `include` to the main ledger file if it is
-   missing. Never edit a generated balance amount or remove its `evidence:`
-   link.
+   Create the year file if needed. Check the main ledger’s existing include
+   coverage before adding an include: `include "years/*.beancount"` already
+   covers every year file. Add an explicit year include only when no existing
+   include covers it; overlapping includes cause duplicate-file errors. Never
+   edit a generated balance amount or remove its `evidence:` link.
 
 4. **Receipts.** For files in `inbox/receipts/`, read each one, then match it
    to a transaction by exact amount, date within 3 days, and payee. File a

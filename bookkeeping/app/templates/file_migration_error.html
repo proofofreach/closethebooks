@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head"><div><h1>Migration blocked</h1></div></div>
+<div class="form-errors" role="alert"><p>{{ error }}</p></div>
+<p>The migration did not apply new ledger history. Correct the export or mapping and create a fresh preview.</p>
+<div class="form-actions">{% if stage_id %}<a class="button" href="{{ url_for('file_migrations.review', provider=provider, stage_id=stage_id, edit=1) }}">Review mapping</a>{% endif %}<a class="button quiet" href="{{ url_for('file_migrations.start', provider=provider) }}">Choose another export</a></div>
+{% endblock %}

@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head"><div><h1>Move your books</h1><p>Bring accounting history into a new workspace. Review the source evidence and validation results before applying a migration.</p></div></div>
+<ol class="migration">
+  <li class="step"><div class="step-head"><h2>Xero</h2></div><p>Connect to Xero, back up your organisation, and add its general ledger export.</p><a class="button" href="{{ url_for('migrate') }}">Move from Xero</a></li>
+  {% for provider, label in providers.items() %}
+  <li class="step"><div class="step-head"><h2>{{ label }}</h2></div><p>Upload journal rows, map columns and accounts, compare source totals, then review the ledger history.</p><a class="button" href="{{ url_for('file_migrations.start', provider=provider) }}">Move from {{ label }}</a></li>
+  {% endfor %}
+</ol>
+<section class="section"><h2>Coverage</h2><p>{{ limitations }}</p><p>Already have bank statements? Use <a href="{{ url_for('import_page') }}">Import</a> to prepare proposals for an existing workspace.</p></section>
+{% endblock %}

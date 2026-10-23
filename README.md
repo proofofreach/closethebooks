@@ -110,7 +110,7 @@ books agent-files [--force]     # install or refresh the bookkeeping agent instr
 
 ## Moving from Xero
 
-Start from a new workspace and open **Settings → Move from Xero**. The page walks through six steps:
+Start from a new workspace and open **Settings → Move accounting history → Xero**. The page walks through six steps:
 
 1. Create a free Xero app (Mobile or desktop, so no client secret) with the redirect URI the page shows.
 2. Sign in and choose the organisation. Access is read-only.
@@ -120,6 +120,12 @@ Start from a new workspace and open **Settings → Move from Xero**. The page wa
 6. Register bank and card accounts. Imports begin the day after the Xero history ends.
 
 Conversion is refused once the ledger has its own transactions or registered accounts, so it cannot overwrite real bookkeeping. The same steps exist on the command line: `xero-backup`, `books xero-merge-gl`, `books xero-convert`, `books xero-verify`.
+
+## File-first imports
+
+Start with statement files; Plaid is optional. Generic bank CSVs require explicit column, date, amount-direction, and currency mapping with a validated preview.
+
+Open **Settings → Move accounting history** for Xero, QuickBooks Online, or Wave. QuickBooks/Wave support explicitly mapped CSV/XLSX journal history (including Wave ZIP exports), with account mapping, independent source totals, preview, and a separate apply step. This imports single-currency ledger history into an empty workspace. Open invoices, bills, attachments, and reconciliation state are excluded. See [the migration contract](docs/FILE_MIGRATIONS.md).
 
 ## Status
 
@@ -137,7 +143,7 @@ Version 0.3.0. See [CHANGELOG.md](CHANGELOG.md).
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -e ".[dev,xero]"
-.venv/bin/pytest -q             # 102 tests
+.venv/bin/pytest -q             # full test suite
 ```
 
 `PRODUCT.md` defines the product and `DESIGN.md` the interface system. `docs/` covers statement formats, Plaid setup, and Teller.

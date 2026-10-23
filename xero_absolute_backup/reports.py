@@ -6,8 +6,7 @@ import csv
 import json
 
 from .exporters import write_csv_rows
-from .client import XeroClient, TokenStore
-from xero_python.api_client import serialize
+from .client import XeroClient, TokenStore, serialize
 from .config import Settings
 
 

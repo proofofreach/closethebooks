@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head"><div><h1>Map source accounts</h1><p>Assign each source account to one distinct ledger account. Use your source chart to preserve each account's type and meaning.</p></div></div>
+{% if error %}<div class="form-errors" role="alert"><p>{{ error }}</p><p>Your entered mapping is retained below. Correct it or change the column mapping and source totals.</p></div>{% endif %}
+<form method="post" action="{{ url_for('file_migrations.preview', provider=provider, stage_id=stage_id) }}" data-busy-form>
+<input type="hidden" name="csrf" value="{{ csrf_token }}">
+<p class="hint" id="account-hint">Full account names begin with Assets, Liabilities, Equity, Income, or Expenses; for example, Assets:Bank:Checking. Names are case-sensitive. No account types are guessed.</p>
+{% for account in draft.source_accounts %}<div class="field"><label for="account_{{ loop.index0 }}">{{ account }}</label><input type="text" id="account_{{ loop.index0 }}" name="account_{{ loop.index0 }}" class="mono" value="{{ draft.spec.get('accounts', {}).get(account, '') }}" aria-describedby="account-hint" spellcheck="false" required></div>{% endfor %}
+<div class="form-actions"><button class="button primary" type="submit" data-busy-label="Validating journals…">Preview ledger history</button><a class="button quiet" href="{{ url_for('file_migrations.review', provider=provider, stage_id=stage_id, edit=1) }}">Change column mapping</a></div>
+</form>
+<p class="hint">Preview retains your mapping and a proposed ledger under imports/file-migrations. It does not change the ledger.</p>
+{% endblock %}

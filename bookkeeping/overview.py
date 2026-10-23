@@ -334,6 +334,7 @@ def build_overview(
                 )
             )
 
+    has_transactions = any(isinstance(entry, Transaction) for entry in entries)
     if not sources:
         state, title, summary = (
             "incomplete",
@@ -350,17 +351,18 @@ def build_overview(
                 link_label="Add account",
             ),
         )
-        actions.insert(
-            1,
-            Action(
-                "migrate",
-                "Coming from Xero? Bring your history",
-                "Back up the organisation, convert its general ledger, and verify it to the cent. "
-                "Do this before adding accounts by hand.",
-                href="/migrate",
-                link_label="Move from Xero",
-            ),
-        )
+        if not has_transactions:
+            actions.insert(
+                1,
+                Action(
+                    "migrate",
+                    "Bring existing accounting history",
+                    "Move ledger history from Xero, QuickBooks Online, or Wave. "
+                    "Review source coverage and totals before accepting a migration. Do this before registering accounts.",
+                    href="/migrations",
+                    link_label="Move accounting history",
+                ),
+            )
     elif not active:
         state, title, summary = (
             "incomplete",
@@ -426,5 +428,6 @@ def build_overview(
         "inactive": inactive,
         "cash_series": chart_points,
         "ledger_errors": len(errors),
+        "has_transactions": has_transactions,
         "status": status,
     }

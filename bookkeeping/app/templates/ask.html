@@ -21,7 +21,7 @@
       'Where do we stand? Cash, receivables, and this year\'s net income.',
       'What were the biggest expense categories this year, and how do they compare with last year?',
       'Which invoices are unpaid, and how old are they?'] %}
-      <button type="button" class="button small" data-starter="{{ prompt }}">{{ prompt }}</button>
+      <button type="button" class="button small" data-starter="{{ prompt }}" {{ 'disabled' if not engines }}>{{ prompt }}</button>
     {% endfor %}
   </div>
 

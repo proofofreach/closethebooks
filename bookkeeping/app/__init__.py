@@ -9,10 +9,12 @@ from __future__ import annotations
 
 import datetime as dt
 import ipaddress
+import hashlib
 import json
 import secrets
 import threading
 import webbrowser
+from urllib.parse import urlsplit
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
@@ -45,6 +47,7 @@ MAX_STATEMENT_BYTES = 20 * 1024 * 1024
 DEFAULT_STATEMENT_EXTENSIONS = {".csv", ".mt940", ".ofx", ".qbo", ".qfx", ".sta", ".swift"}
 ALL_STATEMENT_EXTENSIONS = DEFAULT_STATEMENT_EXTENSIONS | {".pdf"}
 PDF_PRESETS = {"quickbooks-checking": "QuickBooks Checking PDF"}
+STATEMENT_PRESETS = {**PDF_PRESETS, "paypal": "PayPal activity CSV"}
 
 
 def save_statement_upload(
@@ -75,6 +78,17 @@ def save_statement_upload(
                     if total > max_bytes:
                         raise ValueError("Statement files must be 20 MB or smaller.")
                     target.write(chunk)
+            # Reuse identical evidence for this account. Renamed copies change
+            # synthetic transaction IDs and otherwise conflict during preparation.
+            digest = hashlib.sha256(destination.read_bytes()).digest()
+            for existing in sorted(inbox.iterdir()):
+                if existing == destination or not existing.is_file():
+                    continue
+                if not existing.name.startswith(f"{account_key}--") or existing.suffix.lower() != suffix:
+                    continue
+                if existing.stat().st_size == total and hashlib.sha256(existing.read_bytes()).digest() == digest:
+                    destination.unlink()
+                    return existing
             return destination
         except FileExistsError:
             continue
@@ -154,12 +168,23 @@ def inbox_files(workspace: Workspace, sources: dict[str, AccountSource]) -> list
         key, separator, _rest = path.name.partition("--")
         source = sources.get(key) if separator else None
         stat = path.stat()
+        csv_mapped = False
+        csv_mapping_error = False
+        if path.suffix.lower() == '.csv' and source and source.statement_preset != 'paypal':
+            from ..csv_mapping import load_mapping
+            try:
+                csv_mapped = load_mapping(path) is not None
+            except (ValueError, OSError):
+                csv_mapping_error = True
         files.append(
             {
                 "name": path.name,
                 "key": source.key if source else None,
                 "account": source.name if source else None,
                 "active": bool(source and source.lifecycle == "active"),
+                "preset": source.statement_preset if source else None,
+                "csv_mapped": csv_mapped,
+                "csv_mapping_error": csv_mapping_error,
                 "size": stat.st_size,
                 "added": dt.datetime.fromtimestamp(stat.st_mtime),
             }
@@ -301,22 +326,36 @@ def create_app(workspace: Workspace, *, mount_reports: bool = True) -> Flask:
     )
     app.secret_key = secrets.token_bytes(32)
     app.config["MAX_CONTENT_LENGTH"] = MAX_STATEMENT_BYTES + 256_000
+    from .csv_import import bp as csv_import_bp
+    app.register_blueprint(csv_import_bp)
+    from .migrations import bp as migration_bp
+    app.register_blueprint(migration_bp)
     state = State(workspace)
     app.extensions["books_state"] = state
     token = secrets.token_urlsafe(24)
+    upload_lock = threading.Lock()
 
     app.jinja_env.filters["money"] = _money
     app.jinja_env.filters["day"] = _date
     app.jinja_env.globals.update(product_name=PRODUCT_NAME, csrf_token=token)
 
-    @app.before_request
-    def guard():
+    def require_local_request():
         try:
             remote = ipaddress.ip_address(request.remote_addr or "")
         except ValueError:
             remote = None
-        if remote is None or not remote.is_loopback:
+        # A loopback peer alone does not prevent DNS rebinding.
+        hostname = urlsplit(request.host_url).hostname
+        try:
+            local_host = ipaddress.ip_address(hostname or "").is_loopback
+        except ValueError:
+            local_host = hostname == "localhost"
+        if not local_host or remote is None or not remote.is_loopback:
             abort(403)
+
+    @app.before_request
+    def guard():
+        require_local_request()
         if request.method == "POST":
             supplied = request.headers.get("X-Books-Token") or request.form.get("csrf")
             if not supplied or not secrets.compare_digest(supplied, token):
@@ -338,9 +377,24 @@ def create_app(workspace: Workspace, *, mount_reports: bool = True) -> Flask:
             return jsonify({"error": message}), 403
         return render_template("error.html", title="Request refused", message=message), 403
 
+    @app.after_request
+    def private_response(response):
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        response.headers["Referrer-Policy"] = "same-origin"
+        return response
+
+    @app.errorhandler(404)
+    def not_found(_exc):
+        return render_template("error.html", title="Page not found", message="This page does not exist. Use the navigation to return to your books."), 404
+
     @app.errorhandler(413)
     def too_large(_exc):
-        return jsonify({"error": "Statement files must be 20 MB or smaller."}), 413
+        message = "The upload is too large. Choose a file of 20 MB or smaller and try again."
+        if request.headers.get("X-Books-Token") is not None:
+            return jsonify({"error": message}), 413
+        return render_template("error.html", title="Upload too large", message=message), 413
 
     @app.get("/")
     def overview():
@@ -375,17 +429,18 @@ def create_app(workspace: Workspace, *, mount_reports: bool = True) -> Flask:
             upload_file = request.files.get("statement")
             if upload_file is None or not upload_file.filename:
                 raise ValueError("Choose a statement file to upload.")
-            destination = save_statement_upload(
-                upload_file,
-                state.workspace.inbox,
-                key,
-                allowed_extensions=statement_extensions(source),
-            )
+            with upload_lock:
+                destination = save_statement_upload(
+                    upload_file,
+                    state.workspace.inbox,
+                    key,
+                    allowed_extensions=statement_extensions(source),
+                )
         except ValueError as exc:
             if wants_json:
                 return jsonify({"error": str(exc)}), 400
             flash(str(exc), "error")
-            return redirect(request.form.get("next") or url_for("import_page"))
+            return redirect(url_for("import_page"))
         except OSError:
             message = "The statement could not be saved to the inbox. Check that the folder is writable."
             if wants_json:
@@ -395,7 +450,7 @@ def create_app(workspace: Workspace, *, mount_reports: bool = True) -> Flask:
         if wants_json:
             return jsonify({"filename": destination.name, "account": source.name})
         flash(f"Saved {destination.name} to the inbox.", "success")
-        return redirect(request.form.get("next") or url_for("import_page"))
+        return redirect(url_for("import_page"))
 
     @app.get("/import")
     def import_page():
@@ -422,6 +477,13 @@ def create_app(workspace: Workspace, *, mount_reports: bool = True) -> Flask:
         ]
         skipped = [item["name"] for item in files if not (item["key"] and item["active"])]
         try:
+            from ..csv_mapping import load_mapping
+            unmapped = [path.name for key, path, _ in statements
+                        if path.suffix.lower() == '.csv'
+                        and sources[key].statement_preset != 'paypal'
+                        and load_mapping(path) is None]
+            if unmapped:
+                raise ValueError('Choose Map CSV and validate each file before preparing: ' + ', '.join(unmapped))
             result = run_propose(state.workspace, statements)
         except (ValueError, RuntimeError, OSError) as exc:
             flash(f"Proposals were not prepared. {exc}", "error")
@@ -518,7 +580,7 @@ def create_app(workspace: Workspace, *, mount_reports: bool = True) -> Flask:
             values=values,
             errors=errors,
             formats=STATEMENT_FORMATS,
-            presets=PDF_PRESETS,
+            presets=STATEMENT_PRESETS,
         )
 
     @app.route("/accounts/new", methods=["GET", "POST"])
@@ -601,10 +663,13 @@ def create_app(workspace: Workspace, *, mount_reports: bool = True) -> Flask:
     @app.post("/ask")
     def ask_stream():
         payload = request.get_json(silent=True) or {}
+        if not isinstance(payload, dict):
+            return jsonify({"error": "Send a question as a JSON object."}), 400
         question = str(payload.get("question") or "").strip()
         if not question:
             return jsonify({"error": "Type a question first."}), 400
         history = payload.get("history") if isinstance(payload.get("history"), list) else []
+        history = [turn for turn in history if isinstance(turn, dict)]
         workspace = state.workspace
         return Response(
             stream_with_context(assistant.answer(workspace, question[:4000], history)),
@@ -642,7 +707,7 @@ def create_app(workspace: Workspace, *, mount_reports: bool = True) -> Flask:
                 state.reload_workspace()
                 flash("Settings saved.", "success")
                 return redirect(url_for("settings"))
-        return render_template("settings.html", title="Settings", errors=errors)
+        return render_template("settings.html", title="Settings", errors=errors, form=request.form)
 
     from ..xero_migration import XeroMigration
 
@@ -796,6 +861,9 @@ def create_app(workspace: Workspace, *, mount_reports: bool = True) -> Flask:
         from werkzeug.middleware.dispatcher import DispatcherMiddleware
 
         fava = create_fava([str(workspace.ledger_main)], load=True, read_only=True)
+        # DispatcherMiddleware bypasses Books' Flask request hooks.
+        fava.before_request(require_local_request)
+        fava.after_request(private_response)
         app.wsgi_app = DispatcherMiddleware(app.wsgi_app, {"/reports": fava.wsgi_app})  # type: ignore[method-assign]
     return app
 

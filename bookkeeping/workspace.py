@@ -213,6 +213,9 @@ def parse_config(root: Path, payload: dict) -> Workspace:
         payment_instructions=str(invoice_data.get("payment_instructions", "")),
     )
 
+    if not 0 <= invoicing.due_days <= 3650:
+        raise WorkspaceError(f"{CONFIG_NAME}: invoices.due_days must be between 0 and 3650.")
+
     assistant_data = payload.get("assistant") or {}
     assistant = Assistant(
         engines=_strings(assistant_data.get("engines", ["claude", "codex"]), "assistant.engines"),

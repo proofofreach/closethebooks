@@ -248,9 +248,9 @@ def upload(name, data=b"Date,Amount\n"):
     return FileStorage(stream=io.BytesIO(data), filename=name)
 
 
-def test_upload_uses_safe_account_prefixed_name_and_preserves_duplicates(tmp_path):
+def test_upload_uses_safe_account_prefixed_name_and_preserves_different_contents(tmp_path):
     first = save_statement_upload(upload("../June statement.CSV"), tmp_path, "checking")
-    second = save_statement_upload(upload("June statement.csv"), tmp_path, "checking")
+    second = save_statement_upload(upload("June statement.csv", b"Date,Amount\n2026-06-01,1.00\n"), tmp_path, "checking")
     assert first.name == "checking--June_statement.csv"
     assert second.name == "checking--June_statement-2.csv"
 

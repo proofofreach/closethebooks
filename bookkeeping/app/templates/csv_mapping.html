@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head"><div><p><a href="{{ url_for('import_page') }}">Import</a> / Bank CSV</p><h1>Map bank CSV</h1><p>{{ source.name }} · {{ source.currency }} · <span class="mono file-name">{{ filename }}</span></p></div></div>
+<p class="lede">Choose how to read this file, then check the preview. Every row is validated before the mapping is saved. The original file stays intact. This does not post transactions.</p>
+{% if error %}<div class="form-errors" role="alert"><ul>{% for line in error.splitlines() %}<li>{{ line }}</li>{% endfor %}</ul><p>Correct the mapping or upload a corrected export. Your ledger and saved mapping have not changed.</p></div>{% endif %}
+<form method="post" action="{{ url_for('csv_import.mapping', filename=filename) }}">
+<input type="hidden" name="csrf" value="{{ csrf_token }}">
+<section class="section" aria-labelledby="read-heading"><h2 id="read-heading">1. Read the columns</h2>
+<div class="inline-form"><div class="field"><label for="delimiter">Separator</label><select id="delimiter" name="delimiter">{% for value,label in [(',', 'Comma'), (';', 'Semicolon'), ('\t', 'Tab')] %}<option value="{{ value }}"{% if values.delimiter == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></div><button type="submit" name="action" value="columns" class="button" formnovalidate>Read columns</button></div>
+{% if inspection %}<p class="muted">{{ inspection.row_count }} data rows. First rows from your original file:</p><p class="hint">Scroll the sample sideways to see all columns when needed.</p>
+<div class="table-wrap csv-sample" role="region" aria-label="Original CSV sample" tabindex="0"><table><thead><tr>{% for header in inspection.headers %}<th scope="col">{{ header }}</th>{% endfor %}</tr></thead><tbody>{% for row in inspection.sample %}<tr>{% for header in inspection.headers %}<td>{{ row[header] }}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>{% endif %}
+</section>
+{% if inspection %}
+<section class="section" aria-labelledby="map-heading"><h2 id="map-heading"{% if columns_read %} tabindex="-1" data-columns-heading{% endif %}>2. Match fields</h2><p class="lede">Select an amount column, or separate debit and credit columns. A debit is money out; a credit is money in. Date and description are required. Leave unrelated columns unused. Amounts use {{ source.currency }}; map the currency column when the file includes one.</p>
+<div class="field-row">{% for field in fields %}<div class="field"><label for="map-{{ field }}">{{ field | capitalize }} column</label><select id="map-{{ field }}" name="{{ field }}"{% if field in ('date', 'description') %} required{% endif %}><option value="">{{ 'Choose a column' if field in ('date', 'description') else 'Not used' }}</option>{% for header in inspection.headers %}<option value="{{ header }}"{% if values.get(field) == header %} selected{% endif %}>{{ header }}</option>{% endfor %}</select></div>{% endfor %}</div>
+<div class="field-row">
+<div class="field"><label for="date-format">Date order</label><select id="date-format" name="date_format" required><option value="">Choose date order</option>{% for value,label in [('iso','Year-month-day (2026-10-21)'),('mdy','Month/day/year (10/21/2026)'),('dmy','Day/month/year (21/10/2026)')] %}<option value="{{ value }}"{% if values.date_format == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+<div class="field"><label for="number-format">Decimal separator</label><select id="number-format" name="number_format" required><option value="">Choose decimal separator</option>{% for value,label in [('dot','Dot (1,234.56)'),('comma','Comma (1.234,56)')] %}<option value="{{ value }}"{% if values.number_format == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+<div class="field"><label for="balance-order">Balance row order</label><select id="balance-order" name="balance_order" aria-describedby="balance-order-hint"><option value="">Choose if mapping a balance</option>{% for value,label in [('oldest_first','Oldest first; last row is final'),('newest_first','Newest first; first row is final')] %}<option value="{{ value }}"{% if values.balance_order == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select><p id="balance-order-hint" class="hint">Required only with a running balance column. Includes row order within the same date.</p></div>
+<div class="field"><label for="amount-sign">Positive amounts mean</label><select id="amount-sign" name="amount_sign" aria-describedby="amount-sign-hint"><option value="">Choose amount direction</option>{% for value,label in [('inflow','Money in'),('outflow','Money out')] %}<option value="{{ value }}"{% if values.amount_sign == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select><p id="amount-sign-hint" class="hint">Applies to a single amount column. Debit/credit columns already give direction.</p></div>
+</div>
+<div class="form-actions"><button type="submit" name="action" value="preview" class="button primary">Preview all rows</button><a class="button" href="{{ url_for('import_page') }}">Back to Import</a></div>
+</section>
+{% endif %}
+{% if preview %}
+<input type="hidden" name="preview_token" value="{{ preview_token }}">
+<section class="section" aria-labelledby="preview-heading"><h2 id="preview-heading" tabindex="-1" data-preview-heading>Validated preview</h2><p>{{ preview.transactions | length }} rows validated. Showing the first 20. Confirm dates, signs, and amounts before saving.</p>
+{% if source.invert %}<p class="notice">This account also reverses transaction amounts in its account settings. The preview below includes that reversal. Check it against a known purchase before preparing proposals.</p>{% endif %}
+{% if ambiguous_dates %}<p class="notice">{{ ambiguous_dates }} date{{ 's' if ambiguous_dates != 1 }} can also be read in the other day/month order. Confirm the date order against your bank’s export settings before saving.</p>{% endif %}
+<div class="table-wrap"><table class="responsive"><thead><tr><th scope="col">Date</th><th scope="col">Description</th><th scope="col" class="num">Amount</th></tr></thead><tbody>{% for txn in preview.transactions[:20] %}<tr><td data-label="Date">{{ txn.date }}</td><td class="wide">{{ txn.description }}</td><td data-label="Amount" class="num"><span>{{ (-txn.amount if source.invert else txn.amount) | money(source.currency) }}</span><span class="account-path">{{ 'Money out' if (-txn.amount if source.invert else txn.amount) < 0 else ('Money in' if txn.amount != 0 else 'Zero amount') }}</span></td></tr>{% endfor %}</tbody></table></div>
+{% if preview.ending_balance is not none %}<p>Ending balance: {{ preview.ending_balance | money(source.currency) }} on {{ preview.ending_balance_date }}. Account balance-sign settings still apply.</p>{% endif %}
+<div class="form-actions"><button type="submit" name="action" value="save" class="button primary">Use this mapping</button><span class="muted">Saves only this file’s mapping. Prepare proposals next.</span></div>
+</section>{% endif %}
+</form>
+{% endblock %}

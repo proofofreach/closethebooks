@@ -300,7 +300,11 @@ def run_propose(
                 raise ValueError(f"Unknown statement account key: {key!r}.")
             if mapped_account.lifecycle != "active":
                 raise ValueError(f"Statement account {key!r} is not active.")
-            parsed = parse_statement(path, preset=preset or mapped_account.statement_preset)
+            parsed = parse_statement(
+                path,
+                preset=preset or mapped_account.statement_preset,
+                expected_currency=mapped_account.currency,
+            )
             for txn in parsed.transactions:
                 transactions.append(
                     FeedTransaction(

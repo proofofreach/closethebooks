@@ -56,11 +56,12 @@
     <p class="hint">PDF needs a parser that reconciles the statement's balances.</p>
   </fieldset>
   <div class="field">
-    <label for="preset">PDF parser</label>
+    <label for="preset">Statement parser</label>
     <select id="preset" name="preset">
       <option value="">None</option>
       {% for value, label in presets.items() %}<option value="{{ value }}" {{ 'selected' if values.get('statement_preset') == value }}>{{ label }}</option>{% endfor %}
     </select>
+    <p class="hint">Choose PayPal for its activity CSV, or a bank parser for PDF. Other CSV and bank formats use None.</p>
   </div>
 
   <div class="field-row">

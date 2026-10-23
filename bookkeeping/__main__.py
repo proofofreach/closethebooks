@@ -95,7 +95,8 @@ def build_parser() -> ArgumentParser:
     plaid_connect_parser = subparsers.add_parser(
         "plaid-connect", help="Connect an institution through local-only Plaid Link"
     )
-    plaid_connect_parser.add_argument("--redirect-uri", default="http://localhost:8767/")
+    plaid_connect_parser.add_argument("--redirect-uri", default="http://localhost:8767/", help="Local helper URL (not an OAuth redirect in popup mode)")
+    plaid_connect_parser.add_argument("--oauth-mode", choices=["popup", "redirect"], default="popup", help="Popup works locally in production; HTTP redirect mode is Sandbox-only")
 
     subparsers.add_parser(
         "plaid-accounts", help="List connected Plaid account IDs for add-account"
@@ -290,6 +291,7 @@ def run(args, workspace: Workspace) -> int:
             client_from_environment(),
             PlaidItemStore(workspace.secrets / "plaid"),
             args.redirect_uri,
+            oauth_mode=args.oauth_mode,
             company=workspace.company.name,
             country_code=workspace.company.country,
         )

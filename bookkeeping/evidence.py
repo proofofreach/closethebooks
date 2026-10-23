@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import shutil
 from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
@@ -38,7 +37,10 @@ def create_statement_artifact(
         raise ValueError(
             f"Unsupported statement balance sign: {source.statement_balance_sign!r}."
         )
-    content_hash = hashlib.sha256(statement.path.read_bytes()).hexdigest()
+    source_content = statement.path.read_bytes()
+    content_hash = hashlib.sha256(source_content).hexdigest()
+    if statement.source_sha256 is not None and statement.source_sha256 != content_hash:
+        raise ValueError(f"{statement.path.name}: statement source changed after parsing.")
     dates = sorted(transaction.date for transaction in statement.transactions)
     transaction_ids = "\n".join(
         sorted(transaction.txn_id for transaction in statement.transactions)
@@ -75,6 +77,9 @@ def create_statement_artifact(
             else "transactions_only"
         ),
     }
+    if statement.csv_mapping is not None:
+        evidence["csv_mapping"] = statement.csv_mapping
+        evidence["csv_mapping_sha256"] = statement.csv_mapping_sha256
     evidence_dir.mkdir(parents=True, exist_ok=True)
     evidence_path = evidence_dir / f"{content_hash}.json"
     source_evidence_path = evidence_dir / evidence["source_evidence"]
@@ -92,7 +97,7 @@ def create_statement_artifact(
         temporary_source = source_evidence_path.with_suffix(
             source_evidence_path.suffix + ".tmp"
         )
-        shutil.copyfile(statement.path, temporary_source)
+        temporary_source.write_bytes(source_content)
         temporary_source.replace(source_evidence_path)
 
     assertion = None

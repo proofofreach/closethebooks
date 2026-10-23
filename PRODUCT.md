@@ -44,8 +44,9 @@ the user to remember the ingestion pipeline.
 3. **One clear next step.** Translate stale or incomplete state into a concrete
    instruction such as downloading a named account's statement.
 4. **Prepare, never post.** The app may stage work (statements, proposals,
-   invoice documents, account setup). Transactions reach the ledger only
-   through the reviewed `do-the-books` workflow. Ask is read-only.
+   invoice documents, account setup). Recurring transactions reach the ledger through the reviewed `do-the-books`
+   workflow. A one-time migration may initialize an empty ledger only after
+   source verification, a coverage review, and explicit acceptance. Ask is read-only.
 5. **Local and inspectable.** Keep data and behavior understandable from files;
    avoid UI state that obscures ledger state.
 6. **Failure must be actionable.** Name what failed, what remains safe, and how
@@ -63,7 +64,10 @@ The dashboard answers these questions in order:
 4. What is the current financial snapshot?
 5. Where can I inspect detail or ask a question?
 
-The Import page turns statements into proposals and hands off to the agent.
+The Import page starts with files: recurring bank statements or one-time
+accounting history. It turns statements into proposals and hands off to the agent.
+CSV mapping makes column meanings, date order, number format, and amount direction
+explicit. Plaid and Teller are optional advanced feeds, not onboarding prerequisites.
 Accounts registers bank and card sources. Invoices shows status from the
 ledger and creates invoice documents. The Ask page answers read-only financial
 questions from ledger data. It must

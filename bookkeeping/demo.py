@@ -132,4 +132,8 @@ def create_demo(root: Path, today: dt.date | None = None) -> Path:
         payee, _account, typical = CARD_SPEND[offset % len(CARD_SPEND)]
         lines.append(f"{day.isoformat()},{payee.upper()},-{typical:.2f}")
     statement.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    from .csv_mapping import save_mapping
+    save_mapping(statement, dict(date='Date', description='Description', amount='Amount',
+                                date_format='iso', delimiter=',', number_format='dot',
+                                amount_sign='inflow', expected_currency='USD'))
     return workspace.root

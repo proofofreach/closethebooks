@@ -323,7 +323,7 @@ def add_account_source(
     unknown = [ext for ext in extensions if ext not in STATEMENT_FORMATS]
     if unknown:
         raise ValueError(f"Unsupported statement format: {', '.join(unknown)}.")
-    if "pdf" in extensions and not statement_preset:
+    if "pdf" in extensions and statement_preset not in {"quickbooks-checking"}:
         raise ValueError("PDF statements need a parser preset (for example quickbooks-checking).")
     if expected_cadence_days < 1 or overdue_after_days < expected_cadence_days:
         raise ValueError("The overdue threshold must be at least the expected cadence.")

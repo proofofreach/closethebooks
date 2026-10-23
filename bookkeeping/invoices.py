@@ -97,7 +97,13 @@ def parse_amount(value: str) -> Decimal:
         raise ValueError(f"Amount {value!r} is not a number.") from exc
     if not amount.is_finite() or amount <= 0:
         raise ValueError("Each line amount must be greater than zero.")
-    return amount.quantize(Decimal("0.01"))
+    try:
+        rounded = amount.quantize(Decimal("0.01"))
+    except InvalidOperation as exc:
+        raise ValueError("The line amount is too large.") from exc
+    if rounded <= 0:
+        raise ValueError("Each line amount must be at least 0.01.")
+    return rounded
 
 
 def existing_invoices(workspace: Workspace) -> list[dict]:
@@ -194,8 +200,12 @@ def create_invoice(
         raise ValueError("Each line item needs a description.")
     issue_date = issue_date or dt.date.today()
     due_days = workspace.invoicing.due_days if due_days is None else due_days
-    if due_days < 0:
-        raise ValueError("Payment terms cannot be negative.")
+    if not 0 <= due_days <= 3650:
+        raise ValueError("Payment terms must be between 0 and 3650 days.")
+    try:
+        due_date = issue_date + dt.timedelta(days=due_days)
+    except OverflowError as exc:
+        raise ValueError("Choose an earlier invoice date or shorter payment terms.") from exc
     used = used_invoice_numbers(workspace)
     number = (number or "").strip() or next_invoice_number(workspace, issue_date, used)
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", number):
@@ -217,7 +227,7 @@ def create_invoice(
         client_address=tuple(line.strip() for line in client_address if line.strip()),
         items=line_items,
         issue_date=issue_date,
-        due_date=issue_date + dt.timedelta(days=due_days),
+        due_date=due_date,
         notes=notes,
     )
 

@@ -39,6 +39,9 @@ class ParsedStatement:
     transactions: list[FeedTransaction]
     ending_balance: Decimal | None
     ending_balance_date: str | None
+    csv_mapping: dict | None = None
+    csv_mapping_sha256: str | None = None
+    source_sha256: str | None = None
 
 
 # Column presets for known exports. Keys are lowercase normalized headers.
@@ -78,9 +81,21 @@ def detect_format(path: Path, requested: str = "auto") -> str:
     return "csv"
 
 
-def parse_statement(path: Path, input_format: str = "auto", preset: str | None = None) -> ParsedStatement:
+def parse_statement(
+    path: Path,
+    input_format: str = "auto",
+    preset: str | None = None,
+    *,
+    expected_currency: str | None = None,
+) -> ParsedStatement:
+    path = Path(path)
     detected = detect_format(path, input_format)
     if detected == "csv":
+        from .csv_mapping import _parse_saved_csv
+
+        mapped = _parse_saved_csv(path, expected_currency)
+        if mapped is not None:
+            return mapped
         return parse_csv_statement(path, preset)
     if detected == "ofx":
         return parse_ofx_statement(path)
@@ -99,7 +114,7 @@ def parse_csv_statement(path: Path, preset: str | None = None) -> ParsedStatemen
     with path.open(newline="", encoding="utf-8-sig") as handle:
         rows = list(csv.DictReader(handle))
     if not rows:
-        return ParsedStatement(path, "csv", [], None, None)
+        raise ValueError(f"{path.name}: empty CSV; at least one transaction is required.")
     headers = list(rows[0].keys())
 
     if preset == "paypal":

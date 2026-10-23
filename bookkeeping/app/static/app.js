@@ -3,6 +3,43 @@
 (() => {
   const token = document.querySelector('meta[name="books-token"]')?.content || "";
 
+  const themeChoice = document.querySelector("[data-theme-choice]");
+  let themePreference = "dark";
+  try { themePreference = localStorage.getItem("books-theme") || "dark"; } catch {}
+  if (!["dark", "light", "system"].includes(themePreference)) themePreference = "dark";
+  const systemTheme = matchMedia("(prefers-color-scheme: light)");
+  const applyTheme = () => {
+    document.documentElement.dataset.theme = themePreference === "light" || (themePreference === "system" && systemTheme.matches) ? "light" : "dark";
+  };
+  if (themeChoice) {
+    themeChoice.value = themePreference;
+    themeChoice.addEventListener("change", () => {
+      themePreference = themeChoice.value;
+      try { localStorage.setItem("books-theme", themePreference); } catch {}
+      applyTheme();
+    });
+  }
+  systemTheme.addEventListener("change", applyTheme);
+
+  // Put server validation in the keyboard user's reading path.
+  const errors = document.querySelector(".form-errors");
+  if (errors) { errors.tabIndex = -1; errors.focus(); }
+  else (document.querySelector("[data-preview-heading]") || document.querySelector("[data-columns-heading]"))?.focus();
+
+  const amountColumn = document.querySelector('#map-amount');
+  const debitColumn = document.querySelector('#map-debit');
+  const creditColumn = document.querySelector('#map-credit');
+  const amountDirection = document.querySelector('#amount-sign');
+  if (amountColumn && debitColumn && creditColumn && amountDirection) {
+    const syncDirection = () => {
+      const split = !amountColumn.value && debitColumn.value && creditColumn.value;
+      amountDirection.disabled = Boolean(split);
+      amountDirection.required = !split;
+    };
+    [amountColumn, debitColumn, creditColumn].forEach(control => control.addEventListener('change', syncDirection));
+    syncDirection();
+  }
+
   // Copy buttons
   document.addEventListener("click", async (event) => {
     const button = event.target.closest("[data-copy]");
@@ -34,12 +71,22 @@
     const accepted = (input.accept || "").split(",").map((value) => value.trim().toLowerCase()).filter(Boolean);
     const say = (text, tone = "") => { status.textContent = text; status.className = `dropzone-status ${tone}`; };
 
+    let uploading = false;
     const send = async (file) => {
+      if (uploading) return;
+      if (file.size > 20 * 1024 * 1024) {
+        say("Statement files must be 20 MB or smaller.", "error");
+        return;
+      }
       const extension = `.${file.name.split(".").pop().toLowerCase()}`;
       if (accepted.length && !accepted.includes(extension)) {
         say(`That file type is not accepted for this account. Use ${accepted.join(", ").toUpperCase()}.`, "error");
         return;
       }
+      uploading = true;
+      input.disabled = true;
+      zone.setAttribute("aria-busy", "true");
+      zone.classList.remove("is-done");
       const data = new FormData(zone);
       data.set("statement", file);
       zone.classList.add("is-busy");
@@ -55,13 +102,16 @@
       } finally {
         zone.classList.remove("is-busy");
         input.value = "";
+        input.disabled = false;
+        uploading = false;
+        zone.setAttribute("aria-busy", "false");
       }
     };
 
     input.addEventListener("change", () => input.files[0] && send(input.files[0]));
     ["dragenter", "dragover"].forEach((name) => zone.addEventListener(name, (event) => {
       event.preventDefault();
-      zone.classList.add("is-dragging");
+      if (!uploading) zone.classList.add("is-dragging");
     }));
     ["dragleave", "drop"].forEach((name) => zone.addEventListener(name, (event) => {
       event.preventDefault();
@@ -129,7 +179,10 @@
       if (rows.length === 1) {
         rows[0].querySelectorAll("input").forEach((input) => { input.value = ""; });
       } else {
-        button.closest(".line-item").remove();
+        const row = button.closest(".line-item");
+        const next = row.nextElementSibling || row.previousElementSibling;
+        row.remove();
+        next.querySelector('[name="item"]').focus();
       }
       renumber();
       recalc();
@@ -217,10 +270,16 @@
     const clear = document.querySelector("[data-clear-chat]");
     const storageKey = `books-ask:${location.host}`;
     let history = [];
-    try { history = JSON.parse(sessionStorage.getItem(storageKey) || "[]"); } catch { history = []; }
+    try {
+      const stored = JSON.parse(sessionStorage.getItem(storageKey) || "[]");
+      if (Array.isArray(stored)) history = stored.filter(turn =>
+        turn && ["user", "assistant"].includes(turn.role) && typeof turn.text === "string").slice(-20);
+    } catch { history = []; }
     let controller = null;
 
-    const save = () => sessionStorage.setItem(storageKey, JSON.stringify(history.slice(-20)));
+    const save = () => {
+      try { sessionStorage.setItem(storageKey, JSON.stringify(history.slice(-20))); } catch { /* Chat still works without storage. */ }
+    };
     const nearBottom = () => window.innerHeight + window.scrollY >= document.body.scrollHeight - 160;
 
     const addTurn = (role, text) => {
@@ -244,9 +303,13 @@
       send.disabled = busy;
       textarea.disabled = busy;
       stop.hidden = !busy;
+      clear.disabled = busy;
+      transcript.setAttribute("aria-busy", String(busy));
+      transcript.querySelectorAll("button").forEach(button => { button.disabled = busy; });
     };
 
     const ask = async (question) => {
+      if (controller) return;
       const follow = nearBottom();
       addTurn("user", question);
       const turn = addTurn("assistant", "");
@@ -308,7 +371,7 @@
         retry.type = "button";
         retry.className = "button small";
         retry.textContent = "Try again";
-        retry.addEventListener("click", () => { turn.previousElementSibling?.remove(); turn.remove(); ask(question); });
+        retry.addEventListener("click", () => { if (controller) return; turn.previousElementSibling?.remove(); turn.remove(); ask(question); });
         turn.append(retry);
       } finally {
         controller = null;
@@ -337,6 +400,7 @@
       ask(button.dataset.starter);
     });
     clear.addEventListener("click", () => {
+      if (controller) return;
       if (!window.confirm("Start a new conversation? The current one will be cleared from this tab.")) return;
       history = [];
       save();
